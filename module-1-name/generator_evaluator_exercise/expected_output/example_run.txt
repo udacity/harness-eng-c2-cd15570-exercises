@@ -1,0 +1,77 @@
+# Illustrative, abridged transcript. Responses, scores, and token counts vary.
+============================================================
+GENERATOR–EVALUATOR HARNESS
+============================================================
+============================================================
+Attempt 1
+============================================================
+
+GENERATOR RESPONSE
+------------------------------------------------------------
+The rising database connection count and timeout errors suggest that database
+connections are a likely immediate bottleneck. Restarting workers resets the
+problem temporarily. The newly introduced retries are a possible trigger...
+[Remaining analysis abridged. A live run requests approximately 400–700 words.]
+
+INDEPENDENT EVALUATION
+------------------------------------------------------------
+Evidence grounding:    4/5 — Uses the connection and timeout observations.
+Causal reasoning:      3/5 — Does not explain how retries could grow load.
+Completeness:          3/5 — Compares only some competing explanations.
+Uncertainty:           2/5 — Treats pool exhaustion as confirmed.
+Actionability:         4/5 — Suggests checking pool waits and retry counts.
+
+Overall: 3.2 / 5.0
+
+Biggest weakness:
+The answer treats connection-pool exhaustion as a root cause without examining
+what may have caused the connection growth.
+
+Evaluator feedback:
+Distinguish the immediate bottleneck from the likely trigger. Compare retries
+against memory, database CPU, and network alternatives; name measurements that
+could falsify your hypothesis.
+
+Threshold: 4.2
+Result: REVISE
+============================================================
+Attempt 2
+============================================================
+
+GENERATOR RESPONSE
+------------------------------------------------------------
+The most likely working diagnosis is that retries introduced in the release
+amplify database demand and exhaust or saturate the application's connection
+pool. Pool contention is the immediate mechanism; retry amplification is a
+plausible trigger, not yet a proven root cause...
+[Remaining analysis abridged. A live run requests approximately 400–700 words.]
+
+INDEPENDENT EVALUATION
+------------------------------------------------------------
+Evidence grounding:    5/5 — Ties each major claim to supplied observations.
+Causal reasoning:      4/5 — Separates the bottleneck from its likely trigger.
+Completeness:          4/5 — Discusses the other proposed explanations.
+Uncertainty:           4/5 — States what remains to be measured.
+Actionability:         5/5 — Connects diagnostics and rollback to hypotheses.
+
+Overall: 4.4 / 5.0
+
+Biggest weakness:
+The analysis could give a sharper order for the diagnostic measurements.
+
+Evaluator feedback:
+Prioritize retry rate and pool wait time, then correlate those with timeout
+rates before and after disabling retries.
+
+Threshold: 4.2
+Result: PASS
+
+FINAL RESULT
+Attempts: 2
+Initial score: 3.2
+Final score: 4.4
+Improvement: +1.2
+Status: PASS
+Generator tokens: 1800
+Evaluator tokens: 800
+Total tokens: 2600
