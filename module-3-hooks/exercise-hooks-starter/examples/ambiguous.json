@@ -1,0 +1,56 @@
+{
+  "employee": "Taylor Reed",
+  "report_id": "EXP-1043",
+  "manager_approved": false,
+  "reported_total": 1295.89,
+  "expenses": [
+    {
+      "receipt_id": "A001",
+      "category": "Hotel",
+      "description": "Three-night conference stay",
+      "amount": 498.75
+    },
+    {
+      "receipt_id": "A002",
+      "category": "Meal",
+      "description": "Team dinner after workshop",
+      "amount": 96.40
+    },
+    {
+      "receipt_id": "A003",
+      "category": "Taxi",
+      "description": "Taxi from airport to hotel",
+      "amount": 47.85
+    },
+    {
+      "receipt_id": "A004",
+      "category": "Conference",
+      "description": "Workshop registration",
+      "amount": 500.00
+    },
+    {
+      "receipt_id": "A005",
+      "category": "Meal",
+      "description": "Lunch during workshop",
+      "amount": 32.10
+    },
+    {
+      "receipt_id": "A006",
+      "category": "Train",
+      "description": "Return train ticket",
+      "amount": 74.65
+    },
+    {
+      "receipt_id": "A007",
+      "category": "Parking",
+      "description": "Station parking",
+      "amount": 18.25
+    },
+    {
+      "receipt_id": "A008",
+      "category": "Supplies",
+      "description": "Workshop materials",
+      "amount": 27.90
+    }
+  ]
+}

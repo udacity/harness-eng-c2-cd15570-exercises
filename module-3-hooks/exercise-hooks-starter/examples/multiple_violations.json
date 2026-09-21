@@ -1,0 +1,38 @@
+{
+  "employee": "Alex Morgan",
+  "report_id": "EXP-1042",
+  "manager_approved": false,
+  "reported_total": 1700.00,
+  "expenses": [
+    {
+      "receipt_id": "R001",
+      "category": "Hotel",
+      "description": "Conference hotel",
+      "amount": 780.00
+    },
+    {
+      "receipt_id": "R002",
+      "category": "Meal",
+      "description": "Client dinner",
+      "amount": 185.00
+    },
+    {
+      "receipt_id": "R003",
+      "category": "Taxi",
+      "description": "Airport taxi",
+      "amount": 62.00
+    },
+    {
+      "receipt_id": "R004",
+      "category": "Conference",
+      "description": "Conference registration",
+      "amount": 500.00
+    },
+    {
+      "receipt_id": "R002",
+      "category": "Meal",
+      "description": "Client dinner",
+      "amount": 185.00
+    }
+  ]
+}
