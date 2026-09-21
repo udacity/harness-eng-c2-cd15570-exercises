@@ -1,0 +1,10 @@
+Product: InspectAI
+Launch context: This is the first screen of a landing page for people arriving from a campaign. Some visitors will not know what InspectAI does, so the hero copy must orient them immediately.
+Product capability: InspectAI is an AI-powered industrial inspection platform. It analyzes equipment photographs and identifies visible signs of wear and damage in those images.
+Inspection workflow: Teams take photos of equipment during inspections. Operations and engineering managers review the photos and prepare reports. People remain responsible for interpreting findings and deciding what to do next.
+Audience: Operations managers and engineering managers looking for a clearer way to review inspection photographs. Their concerns are the engineering time manual review takes and variation between inspectors' reports.
+Problem: Manual inspection review takes significant engineering time, and reports can vary between inspectors.
+Value proposition: InspectAI can help teams review inspection photos faster and create more consistent reports. These are practical possibilities, not measured or guaranteed results.
+
+Requested assets: A landing-page headline and subheadline only. The headline should make the primary value clear to a first-time visitor; the subheadline should explain the photo-analysis capability and who it helps. No button, URL, pricing, or other page section is requested.
+Available proof: No performance figures, customer stories, accuracy studies, certifications, or guarantees are supplied. Use only the facts above.

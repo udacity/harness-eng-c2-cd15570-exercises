@@ -1,0 +1,10 @@
+Product: InspectAI
+Launch context: InspectAI is being introduced in a newspaper business section. Readers may notice the ad while scanning a page and may not have heard of the product before.
+Product capability: InspectAI is an AI-powered industrial inspection platform. It analyzes equipment photographs and identifies visible signs of wear and damage in those images.
+Inspection workflow: Teams take photos of equipment during inspections. Managers and supervisors review those photos and use their observations to prepare reports. People remain responsible for interpreting findings and deciding what to do next.
+Audience: Operations managers, engineering managers, and maintenance supervisors. Some readers will know the inspection process well, while others will understand the business problem without knowing technical terms.
+Problem: Manual inspection review takes significant engineering time, and reports can vary between inspectors.
+Value proposition: InspectAI can help teams review inspection photos faster and create more consistent reports; no measured improvement is available.
+
+Requested asset: One short newspaper print advertisement with a headline, body, and call to action. Invite readers to learn more about InspectAI. The copy must communicate the offer without relying on an image or a long technical explanation.
+Placement limits: No image, URL, phone number, QR code, local office, or event date has been supplied. No customer proof, performance figures, accuracy studies, or guarantees are available. Use only the facts above.

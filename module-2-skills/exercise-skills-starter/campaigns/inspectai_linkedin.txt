@@ -1,0 +1,10 @@
+Product: InspectAI
+Launch context: This is the first public introduction of InspectAI to professionals who may not know the product. The goal is awareness, not an immediate purchase.
+Product capability: InspectAI is an AI-powered industrial inspection platform. It analyzes equipment photographs and identifies visible signs of wear and damage in those images.
+Inspection workflow: Teams take equipment photos during inspections. Operations and engineering managers review those photos to understand visible conditions and prepare inspection reports. People remain responsible for interpreting findings and deciding what to do next.
+Audience: Operations managers and engineering managers who oversee inspection review and reporting. They care about how much engineering time manual photo review consumes and whether reports are consistent across inspectors.
+Problem: Manual inspection review takes significant engineering time, and reports can vary between inspectors.
+Value proposition: InspectAI can help teams review inspection photos faster and create more consistent reports. This is a proposed practical benefit, not a measured result.
+
+Requested asset: One LinkedIn launch post that introduces the product to this professional audience and invites readers to learn more. The post should make the photo-analysis capability understandable to someone seeing InspectAI for the first time.
+Available proof and contact details: There are no customer stories, performance figures, accuracy studies, certifications, URLs, or named spokespeople to cite. Use only the facts above; do not invent results, endorsements, or guarantees.

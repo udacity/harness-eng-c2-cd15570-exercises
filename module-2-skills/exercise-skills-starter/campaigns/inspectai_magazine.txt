@@ -1,0 +1,10 @@
+Product: InspectAI
+Launch context: InspectAI is being introduced through an industrial trade magazine. Readers are familiar with maintenance and inspection work and may spend more time with the page than a newspaper reader.
+Product capability: InspectAI is an AI-powered industrial inspection platform. It analyzes equipment photographs and identifies visible signs of wear and damage in those images.
+Inspection workflow: Teams take equipment photos during inspections. Engineering and maintenance leaders review those images and prepare reports that others can use to discuss next steps. People remain responsible for interpreting findings and deciding what to do next.
+Audience: Engineering managers and maintenance leaders who want a concrete explanation of where the product fits in the inspection-review workflow. They will look for specific capabilities rather than broad claims about AI.
+Problem: Manual inspection review takes significant engineering time, and reports can vary between inspectors.
+Value proposition: InspectAI can help teams review inspection photos faster and create more consistent reports. No speed or accuracy improvement has been measured for this brief.
+
+Requested asset: One trade-magazine print advertisement with a headline, short deck, body copy, and call to action. Explain the connection between analyzing photographs, identifying visible wear or damage, and improving the review process. Invite readers to schedule a demo.
+Placement limits: No URL, phone number, QR code, customer example, integration, certification, performance figure, or accuracy study is supplied. Use only the facts above; do not promise automated decisions or guaranteed outcomes.

@@ -1,0 +1,14 @@
+Product: InspectAI
+Launch context: This is the first coordinated introduction of InspectAI across LinkedIn, email, and a landing page. A reader may encounter more than one asset, so the product description and level of claim must stay consistent.
+Product capability: InspectAI is an AI-powered industrial inspection platform. It analyzes equipment photographs and identifies visible signs of wear and damage in those images.
+Inspection workflow: Teams take photos of equipment during inspections. Operations and engineering managers review those photos and prepare reports; maintenance teams use the reports as part of their work. People remain responsible for interpreting findings and deciding what to do next.
+Audience: Operations managers, engineering managers, and maintenance teams. Operations leaders care about the time required for review, engineering leaders care about consistent observations and reports, and maintenance teams need a clear account of visible equipment conditions.
+Problem: Manual inspection review takes significant engineering time, and reports can vary between inspectors.
+Value proposition: InspectAI can help teams review inspection photos faster and create more consistent reports. These are practical benefits, not quantified or guaranteed outcomes.
+
+Requested assets:
+- A LinkedIn launch post for professionals seeing InspectAI for the first time, inviting readers to learn more.
+- A marketing email with a subject line for prospective buyers, inviting readers to schedule a demo.
+- A landing-page headline and subheadline that quickly explain the value and photo-analysis capability to a new visitor.
+
+Campaign requirements: Keep a consistent, credible B2B voice across all three channels. Give each asset its own channel-appropriate structure while preserving the same product capability and measured wording. No URL, booking link, sender name, customer story, performance figure, accuracy study, certification, or guarantee is supplied. Use only the facts above, and do not add newspaper or magazine ads to this request.
