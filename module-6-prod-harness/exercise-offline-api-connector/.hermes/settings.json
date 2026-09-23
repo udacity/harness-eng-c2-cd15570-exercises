@@ -1,0 +1,64 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write(*.py)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m py_compile $CLAUDE_FILE_PATHS"
+          }
+        ]
+      },
+      {
+        "matcher": "web_search",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -qiE \"exec\\(|eval\\(|__import__\"; then echo \"BLOCKED: Code injection in search results\" && exit 2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'LOG=~/.hermes/cache/scratch/token_usage.log; COUNT=$(grep -c \"$(echo $CLAUDE_TOOL_INPUT | md5sum | cut -d\\\" \\x27\\xff\\\" -f1)\" $LOG 2>/dev/null || echo 0); echo $(date +%s) $(echo $CLAUDE_TOOL_INPUT | md5sum | cut -d\\\" \\x27\\xff\\\" -f1) >> $LOG; if [ $COUNT -gt 5 ]; then echo \"BLOCKED: Tool call repetition\" && exit 2; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(*.py)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m py_compile $CLAUDE_FILE_PATHS"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write(*.py)",
+      "Bash(python *)",
+      "Bash(curl localhost:8080/api-docs)",
+      "Bash(curl localhost:8080/health)"
+    ],
+    "ask": [
+      "web_search",
+      "Bash(curl *)",
+      "Bash(pip install *)"
+    ],
+    "deny": [
+      "Bash(curl * | grep -v localhost)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "model": "laguna-s-2.1:free",
+  "description": "Claude Code pre-built hooks for Offline API Connector exercise"
+}

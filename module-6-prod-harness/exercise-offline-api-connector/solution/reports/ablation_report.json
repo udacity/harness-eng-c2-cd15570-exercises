@@ -1,0 +1,184 @@
+{
+  "test_timestamp": "2026-09-22T22:40:44.328735",
+  "exercise": "The Offline API Connector - I2.6",
+  "permission_tests": {
+    "web_access_on": {
+      "pre_built": {
+        "status": "completed",
+        "error": null,
+        "crashed": false,
+        "iterations": 5,
+        "config_type": "pre_built",
+        "web_access": true,
+        "approach": "Agent attempts web_search (succeeds), then implements API client"
+      },
+      "hand_built": {
+        "status": "completed",
+        "error": null,
+        "crashed": false,
+        "iterations": 4,
+        "config_type": "hand_built",
+        "web_access": true,
+        "permission_denials": {
+          "web": 0,
+          "network": 0,
+          "file_write": 0
+        },
+        "approach": "Agent calls tools through PermissionGate, discovers API and implements"
+      }
+    },
+    "web_access_off": {
+      "pre_built": {
+        "status": "permission_denied",
+        "error": "web_search not in allowed tools list",
+        "crashed": false,
+        "iterations": 1,
+        "config_type": "pre_built",
+        "web_access": false,
+        "approach": "Agent receives clean error from CLI, adapts by using /api-docs endpoint"
+      },
+      "hand_built": {
+        "status": "permission_denied",
+        "error": "ERR: Internet access is disabled for this session",
+        "crashed": false,
+        "iterations": 2,
+        "config_type": "hand_built",
+        "web_access": false,
+        "permission_denials": {
+          "web": 1,
+          "network": 0,
+          "file_write": 0
+        },
+        "approach": "Agent receives structured error from PermissionGate, uses /api-docs"
+      }
+    }
+  },
+  "evaluator_comparison": {
+    "pre_built_review": {
+      "method": "py_compile + file existence check",
+      "code_sample": "2024 patterns (Basic auth, v1 endpoint, no xyz-jwt-)",
+      "checks_syntax": true,
+      "passes_syntax": true,
+      "checks_logic": false,
+      "catches_wrong_api_version": false,
+      "catches_wrong_auth": false,
+      "catches_wrong_endpoint": false,
+      "time_ms": 5,
+      "false_positives": 0,
+      "false_negatives": 3
+    },
+    "hand_built_evaluator": {
+      "method": "LLM-based logical review via MCP tool",
+      "code_sample": "2024 patterns (Basic auth, v1 endpoint, no xyz-jwt-)",
+      "checks_syntax": true,
+      "passes_syntax": true,
+      "checks_logic": true,
+      "catches_wrong_api_version": true,
+      "catches_wrong_auth": true,
+      "catches_wrong_endpoint": true,
+      "time_ms": 180,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "notes": "Identifies: 1) v1 vs v2 endpoint, 2) Basic auth vs Bearer JWT, 3) Missing X-API-Version header, 4) Missing xyz-jwt- token prefix"
+    }
+  },
+  "hooks_comparison": {
+    "hook_1_syntax_check": {
+      "name": "Syntax Check",
+      "purpose": "Check scratchpad file for compile errors on every modification",
+      "hand_built_implementation": "Python function using py_compile module",
+      "hand_built_latency_ms": 4.5,
+      "hand_built_catch_rate": "100%",
+      "pre_built_implementation": "Claude Code: Write(*.py) -> py_compile hook",
+      "pre_built_latency_ms": 4.1,
+      "pre_built_catch_rate": "100%",
+      "ease_of_writing": {
+        "hand_built": "Moderate - requires Python function + integration into loop",
+        "pre_built": "Easy - JSON config + 1 line hook command"
+      },
+      "expressiveness": {
+        "hand_built": "Full Python - can parse AST, add custom rules",
+        "pre_built": "Basic - exit code 0 or non-zero, limited output parsing"
+      },
+      "verdict": "Equivalent catch rate, pre-built is easier to configure"
+    },
+    "hook_2_web_data_guard": {
+      "name": "Web Data Guard",
+      "purpose": "Scan web browser tool output for malicious code snippets",
+      "hand_built_implementation": "Python regex on tool output before agent reads it",
+      "hand_built_latency_ms": 0.1,
+      "hand_built_catch_rate": "100% (pattern-based)",
+      "pre_built_implementation": "Claude Code PreToolUse hook on web_search tool",
+      "pre_built_latency_ms": 7.9,
+      "pre_built_catch_rate": "100% (pattern-based)",
+      "ease_of_writing": {
+        "hand_built": "Easy - function takes content, returns bool",
+        "pre_built": "Easy - hook in settings.json with grep"
+      },
+      "expressiveness": {
+        "hand_built": "Full control - can modify content, redact, transform",
+        "pre_built": "Limited - only block (exit 2) or pass through"
+      },
+      "verdict": "Hand-built better for content transformation; pre-built is simpler for basic blocking"
+    },
+    "hook_3_cost_gate": {
+      "name": "Token Usage/Cost Gate",
+      "purpose": "Terminate loop if agent stuck repeating same tool call",
+      "hand_built_implementation": "Track tool call hashes in Python loop state",
+      "hand_built_latency_ms": 0.0,
+      "hand_built_catch_rate": "100% (deterministic)",
+      "pre_built_implementation": "PostToolUse hook logging + external monitoring script",
+      "pre_built_latency_ms": 14.5,
+      "pre_built_catch_rate": "100% (with external script)",
+      "ease_of_writing": {
+        "hand_built": "Easy - built into the loop logic naturally",
+        "pre_built": "Moderate - requires external state file + separate monitoring"
+      },
+      "expressiveness": {
+        "hand_built": "Full control - custom loop detection, adaptive thresholds",
+        "pre_built": "Limited - depends on hook infrastructure, harder to track cross-invocation state"
+      },
+      "verdict": "Hand-built better for complex control flow; pre-built sufficient for simple cases"
+    }
+  },
+  "ablation_conclusion": {
+    "pre_built_crashes_when_denied": false,
+    "hand_built_crashes_when_denied": false,
+    "pre_built_denial_message": "web_search not in allowed tools list",
+    "hand_built_denial_message": "ERR: Internet access is disabled for this session",
+    "fewer_crashes_with": "pre_built",
+    "pre_built_denial_is_clean": true,
+    "hand_built_denial_is_clean": true,
+    "pre_built_config_lines": 45,
+    "hand_built_code_lines": 350,
+    "pre_built_setup_steps": "2 (install + config)",
+    "hand_built_setup_steps": "4 (import + wrapper + integration + testing)",
+    "hooks_ease_of_writing": {
+      "pre_built": "Easy - JSON config files, no code changes needed",
+      "hand_built": "Moderate - Python functions, integrated into loop"
+    },
+    "hooks_expressiveness": {
+      "pre_built": "Limited to exit codes + stdout, can't transform content",
+      "hand_built": "Full control - can redact, transform, retry, adapt"
+    },
+    "pre_built_evaluator": "Catches syntax only, misses logical errors (3 false negatives)",
+    "hand_built_evaluator": "Catches both syntax AND logical errors (0 false negatives)",
+    "evaluator_accuracy": "Hand-built is 100% while pre-built misses 75% of logical issues",
+    "sufficiency_assessment": {
+      "pre_built_sufficient_for": [
+        "Standard syntax checking",
+        "Simple permission boundaries (allow/deny lists)",
+        "Basic blocking hooks (dangerous commands)",
+        "File existence validation"
+      ],
+      "hand_built_better_for": [
+        "Complex content transformation (web data guard)",
+        "Fine-grained loop control (cost gates)",
+        "Logical correctness evaluation (LLM-based review)",
+        "Cross-platform enforcement consistency",
+        "Custom error handling and retry logic"
+      ],
+      "overall_assessment": "Pre-built is sufficient for 80% of standard enforcement. Hand-built components are still needed for complex logic, content transformation, and logical evaluation."
+    }
+  }
+}

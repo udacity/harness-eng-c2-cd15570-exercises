@@ -1,0 +1,56 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "python *": "allow",
+      "curl localhost*": "allow",
+      "curl api-docs": "allow",
+      "rm *": "deny"
+    },
+    "read": {
+      "*": "allow"
+    },
+    "edit": {
+      "*": "allow"
+    },
+    "websearch": "ask",
+    "webfetch": "ask"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'python -m py_compile $OPENCODE_FILE_PATHS 2>&1 || exit 1'"
+          }
+        ]
+      },
+      {
+        "matcher": "websearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$OPENCODE_TOOL_INPUT\" | grep -qiE \"exec\\(|eval\\(\"; then echo \"BLOCKED: Code injection\" && exit 2; fi'"
+          }
+        ]
+      }
+    ]
+  },
+  "agent": {
+    "offline-evaluator": {
+      "description": "Read-only evaluator for API connector exercise",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "bash": "allow",
+        "read": "allow",
+        "websearch": "deny",
+        "webfetch": "allow"
+      }
+    }
+  },
+  "description": "OpenCode configuration for Offline API Connector exercise"
+}

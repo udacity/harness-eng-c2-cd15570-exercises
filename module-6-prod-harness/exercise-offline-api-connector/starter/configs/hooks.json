@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json.schemastore.org/hooks.json",
+  "description": "I2.2 hand-built hooks for The Offline API Connector exercise",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "name": "syntax-check-scratchpad",
+        "description": "Check scratchpad file for basic compile errors when agent modifies it",
+        "match": {
+          "tool": "Write",
+          "pattern": "*/starter/src/*.py"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "python -m py_compile \"$CLAUDE_FILE_PATHS\" 2>&1 && echo 'SYNTAX OK' || { echo 'SYNTAX ERROR DETECTED'; exit 1; }"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "web-data-ingestion-guard",
+        "description": "Scan web browser tool output before agent reads it, blocking malicious code snippets",
+        "match": {
+          "tool": "web_search"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qiE 'exec\\(|eval\\(|__import__|subprocess\\.call.*shell'; then echo 'BLOCKED: Potential code injection in search results' && exit 2; fi"]
+        },
+        "enabled": true
+      }
+    ],
+    "PostToolUse": [
+      {
+        "name": "syntax-check-on-modify",
+        "description": "Verify Python file compiles after Write/Edit",
+        "match": {
+          "tool": "Write",
+          "pattern": "*.py"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "python -m py_compile \"$CLAUDE_FILE_PATHS\" 2>&1 || echo 'WARNING: Syntax check failed'"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "token-usage-gate",
+        "description": "Track repeated tool calls and terminate if agent is stuck in a loop",
+        "match": {
+          "tool": "Bash"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "LOG_FILE=~/.hermes/cache/scratch/token_usage.log; COUNT=$(grep -c \"$(echo $CLAUDE_TOOL_INPUT | md5sum | cut -d' ' -f1)\" $LOG_FILE 2>/dev/null || echo 0); echo $(date +%s) $(echo $CLAUDE_TOOL_INPUT | md5sum | cut -d' ' -f1) >> $LOG_FILE; if [ $COUNT -gt 5 ]; then echo 'BLOCKED: Tool call repetition detected (>5 repeats) - possible loop' && exit 2; fi"]
+        },
+        "enabled": true
+      }
+    ],
+    "Stop": [
+      {
+        "name": "log-session-state",
+        "description": "Log session completion for ablation analysis",
+        "match": {},
+        "action": {
+          "command": "bash",
+          "args": ["-c", "echo \"$(date -Iseconds) Session stopped - hooks executed\" >> ~/.hermes/cache/scratch/session_hooks.log"]
+        },
+        "enabled": true
+      }
+    ]
+  }
+}
