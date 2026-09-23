@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json.schemastore.org/hooks.json",
+  "description": "I2.2 Hand-built enforcement hooks - three enforcement rules for code quality and security",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "name": "block-dangerous-shell-commands",
+        "description": "Block shell commands that modify or delete critical files",
+        "match": {
+          "tool": "Bash"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'rm -rf|git push.*--force|:(){:|:& };'; then echo 'BLOCKED: Dangerous command detected' && exit 2; fi"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "enforce-type-hints",
+        "description": "Require type hints on all new Python functions",
+        "match": {
+          "tool": "Write",
+          "pattern": "*.py"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "if grep -q 'def \\w*([^)]*)\\s*$' \"$CLAUDE_FILE_PATHS\" | grep -v 'def \\w*([^)]*:)' > /dev/null 2>&1; then echo 'WARNING: New Python file lacks type hints on some functions' && exit 1; fi"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "prevent-secrets-commit",
+        "description": "Prevent committing files with potential secrets (API keys, passwords, tokens)",
+        "match": {
+          "tool": "Bash"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git commit'; then FILES=$(git diff --cached --name-only 2>/dev/null || echo ''); for f in $FILES; do if [ -f \"$f\" ] && grep -qiE '(api[_-]?key|secret|password|token)[\\s:=\\\"]+[\\w\\-_]{16,}' \"$f\" 2>/dev/null; then echo 'BLOCKED: Potential secret detected in $f' && exit 2; fi; done; fi"]
+        },
+        "enabled": true
+      }
+    ],
+    "PostToolUse": [
+      {
+        "name": "auto-lint-on-write",
+        "description": "Run linter on Python files after writing",
+        "match": {
+          "tool": "Write",
+          "pattern": "*.py"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "ruff check --fix \"$CLAUDE_FILE_PATHS\" 2>/dev/null || true"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "check-test-coverage",
+        "description": "Verify test coverage after test runs",
+        "match": {
+          "tool": "Bash",
+          "pattern": "pytest *"
+        },
+        "action": {
+          "command": "bash",
+          "args": ["-c", "COVERAGE=$(pytest --cov=. --cov-report=term-missing 2>&1 | grep 'TOTAL' | awk '{print $NF}' || echo '0%'); echo \"Coverage: $COVERAGE\"; if [ \"$COVERAGE\" != '100%' ] && [ \"${COVERAGE%?}\" -lt 80 ]; then echo 'WARNING: Coverage below 80%' && exit 1; fi"]
+        },
+        "enabled": true
+      }
+    ],
+    "Stop": [
+      {
+        "name": "log-session-complete",
+        "description": "Log session completion for audit trail",
+        "match": {},
+        "action": {
+          "command": "bash",
+          "args": ["-c", "echo \"$(date -Iseconds) Session completed\" >> ~/.hermes/cache/scratch/claude-hook-activity.log"]
+        },
+        "enabled": true
+      }
+    ]
+  }
+}

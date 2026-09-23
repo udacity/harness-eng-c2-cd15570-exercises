@@ -1,0 +1,72 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE \"rm -rf|git push.*--force|:(){ :|:& };\"; then echo \"BLOCKED: Dangerous command detected\" && exit 2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE \"git commit\"; then FILES=$(git diff --cached --name-only 2>/dev/null || echo \"\"); for f in $FILES; do if [ -f \"$f\" ] && grep -qiE \"(api[_-]?key|secret|password|token)[\\s:=\\\"]+[\\w\\-_]{16,}\" \"$f\" 2>/dev/null; then echo \"BLOCKED: Potential secret detected in $f\" && exit 2; fi; done; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(*.py)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'ruff check --fix $CLAUDE_FILE_PATHS 2>/dev/null || true'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"$(date -Iseconds) Session completed\" >> ~/.hermes/cache/scratch/claude-hook-activity.log'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write(*.md)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git checkout *)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:*)"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(rm -rf *)",
+      "Bash(docker *)"
+    ],
+    "deny": [
+      "Bash(rm -rf)",
+      "Bash(git push * --force)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  },
+  "model": "claude-sonnet-4",
+  "description": "Claude Code pre-built hooks replicating I2.2 enforcement using native hook system"
+}

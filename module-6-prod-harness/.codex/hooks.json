@@ -1,0 +1,62 @@
+{
+  "description": "Codex pre-built hooks and sandbox restrictions replicating I2.2 enforcement",
+  "sandbox": {
+    "mode": "workspace-write",
+    "restrictions": {
+      "blockDangerousCommands": true,
+      "blockShell": false,
+      "allowFileEdits": true,
+      "networkAccess": "ask"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "read:*",
+      "edit:*",
+      "bash:git status *",
+      "bash:git diff *",
+      "bash:git log *",
+      "bash:npm run *",
+      "bash:ruff *",
+      "bash:grep *"
+    ],
+    "ask": [
+      "bash:git commit *",
+      "bash:docker *",
+      "bash:npm publish *"
+    ],
+    "deny": [
+      "bash:rm -rf *",
+      "bash:git push * --force",
+      "bash:curl *",
+      "bash:wget *"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "bash",
+        "action": {
+          "type": "command",
+          "command": "bash -c 'if echo \"$CODEX_TOOL_INPUT\" | grep -qE \"rm -rf|git push.*--force|:(){ :|:& };\"; then echo \"BLOCKED: Dangerous command detected\" && exit 2; fi'"
+        }
+      },
+      {
+        "matcher": "bash",
+        "action": {
+          "type": "command",
+          "command": "bash -c 'if echo \"$CODEX_TOOL_INPUT\" | grep -qE \"git commit\"; then FILES=$(git diff --cached --name-only 2>/dev/null || echo \"\"); for f in $FILES; do if [ -f \"$f\" ] && grep -qiE \"(api[_-]?key|secret|password|token)[\\s:=\\\"]+[\\w\\-_]{16,}\" \"$f\" 2>/dev/null; then echo \"BLOCKED: Potential secret detected in $f\" && exit 2; fi; done; fi'"
+        }
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "edit*",
+        "action": {
+          "type": "command",
+          "command": "bash -c 'ruff check --fix $CODEX_FILE_PATHS 2>/dev/null || true'"
+        }
+      }
+    ]
+  }
+}

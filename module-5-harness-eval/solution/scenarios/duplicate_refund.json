@@ -1,0 +1,21 @@
+{
+  "task_id": "duplicate_refund",
+  "name": "Duplicate refund request",
+  "authenticated_user": "admin_taylor",
+  "customer_id": "CUST-101",
+  "request": "I still don't see the money for return RET-1006. Please refund it again.",
+  "order_ids": [
+    "ORD-1006"
+  ],
+  "expected_skills": [
+    "customer_service",
+    "returns_policy"
+  ],
+  "oracle": {
+    "kind": "duplicate_refund",
+    "order_id": "ORD-1006",
+    "return_id": "RET-1006",
+    "refund_amount_cents": 7500,
+    "refund_already_issued": true
+  }
+}
