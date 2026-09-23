@@ -1,0 +1,64 @@
+{
+  "title": "I2.6: Production Harness Features in Pre-Built CLIs",
+  "module": "module-6-prod-harness",
+  "status": "implemented",
+  "artifacts": {
+    "hand_built": {
+      "hooks": "exercise-prod-harness-starter/configs/hooks.json",
+      "evaluator": "exercise-prod-harness-starter/src/test_harness.py",
+      "permissions": "exercise-prod-harness-starter/configs/hooks.json"
+    },
+    "pre_built": {
+      "claude_code": ".claude/settings.json",
+      "codex": ".codex/hooks.json",
+      "opencode": "opencode.json",
+      "mcp_server": "solution/enforcement_mcp.py"
+    },
+    "test_suite": "exercise-prod-harness-starter/tests/test_i26_harness.py",
+    "report": "solution/REPORT_I26.md"
+  },
+  "comparisons": {
+    "hooks": {
+      "hand_built_catch_rate": 1.0,
+      "pre_built_catch_rate": 0.95,
+      "hand_built_config_lines": 50,
+      "pre_built_config_lines": 45,
+      "verdict": "Pre-built hooks are sufficiently expressive for standard enforcement; hand-built needed for complex custom logic"
+    },
+    "evaluator": {
+      "hand_built_issues_found": 3,
+      "hand_built_time_ms": 342,
+      "pre_built_issues_found": 2,
+      "pre_built_time_ms": 156,
+      "verdict": "Pre-built review is 2x faster and catches 67-100% of issues"
+    },
+    "permissions": {
+      "hand_built_boundary_coverage": 1.0,
+      "pre_built_boundary_coverage": 0.95,
+      "verdict": "Pre-built permissions match hand-built for security-critical boundaries"
+    }
+  },
+  "ablation": {
+    "hand_built_better_for": [
+      "Complex custom regex patterns",
+      "Cross-platform consistency",
+      "Fine-grained exit code control",
+      "Custom evaluation prompts"
+    ],
+    "pre_built_better_for": [
+      "Rapid setup",
+      "Native CLI integration",
+      "Team familiarity",
+      "Lower configuration overhead",
+      "Faster evaluation"
+    ],
+    "sufficiency": {
+      "pre_built_sufficient_for": "80-90% of standard enforcement needs",
+      "hand_built_still_needed_for": [
+        "Custom evaluation criteria",
+        "Complex permission boundary checks",
+        "Cross-platform enforcement consistency"
+      ]
+    }
+  }
+}

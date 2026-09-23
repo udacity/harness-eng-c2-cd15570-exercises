@@ -1,0 +1,70 @@
+{
+  "summary": {
+    "total_hooks": 3,
+    "hand_built_total_caught": 1,
+    "claude_code_total_caught": 1,
+    "codex_total_caught": 1,
+    "opencode_total_caught": 1,
+    "gemini_total_caught": 1
+  },
+  "hooks": [
+    {
+      "hook_name": "block-dangerous-shell-commands",
+      "hand_built_caught": true,
+      "hand_built_latency_ms": 25.154829025268555,
+      "claude_code_caught": true,
+      "claude_code_latency_ms": 6.588220596313477,
+      "codex_caught": true,
+      "codex_latency_ms": 8.327960968017578,
+      "opencode_caught": true,
+      "opencode_latency_ms": 11.88969612121582,
+      "gemini_caught": true,
+      "gemini_latency_ms": 7.879972457885742,
+      "hand_built_config": "solution/configs/hooks.json",
+      "pre_built_config": ".claude/settings.json + .codex/hooks.json + opencode.json + .gemini/settings.json"
+    },
+    {
+      "hook_name": "prevent-secrets-commit",
+      "hand_built_caught": false,
+      "hand_built_latency_ms": 27.75287628173828,
+      "claude_code_caught": false,
+      "claude_code_latency_ms": 26.026010513305664,
+      "codex_caught": false,
+      "codex_latency_ms": 31.41307830810547,
+      "opencode_caught": false,
+      "opencode_latency_ms": 23.49710464477539,
+      "gemini_caught": false,
+      "gemini_latency_ms": 24.780988693237305,
+      "hand_built_config": "solution/configs/hooks.json (complex - requires git context)",
+      "pre_built_config": "Platform-native hooks (same git context required)"
+    },
+    {
+      "hook_name": "auto-lint-on-write",
+      "hand_built_caught": false,
+      "hand_built_latency_ms": 15.092134475708008,
+      "claude_code_caught": false,
+      "claude_code_latency_ms": 10.451316833496094,
+      "codex_caught": false,
+      "codex_latency_ms": 14.334917068481445,
+      "opencode_caught": false,
+      "opencode_latency_ms": 15.781879425048828,
+      "gemini_caught": false,
+      "gemini_latency_ms": 15.872716903686523,
+      "hand_built_config": "solution/configs/hooks.json (PostToolUse)",
+      "pre_built_config": "All platforms (PostToolUse)"
+    }
+  ],
+  "analysis": {
+    "hand_built_avg_latency_ms": 22.66661326090495,
+    "claude_code_avg_latency_ms": 14.355182647705078,
+    "codex_avg_latency_ms": 18.025318781534832,
+    "opencode_avg_latency_ms": 17.05622673034668,
+    "gemini_avg_latency_ms": 16.177892684936523
+  },
+  "conclusion": {
+    "catch_rates_equivalent": true,
+    "pre_built_faster": true,
+    "pre_built_sufficient_for_standard_enforcement": true,
+    "hand_built_needed_for_custom_logic": true
+  }
+}

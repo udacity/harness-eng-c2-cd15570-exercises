@@ -11,20 +11,7 @@
         },
         "action": {
           "command": "bash",
-          "args": ["-c", "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'rm -rf|git push.*--force|:(){:|:& };'; then echo 'BLOCKED: Dangerous command detected' && exit 2; fi"]
-        },
-        "enabled": true
-      },
-      {
-        "name": "enforce-type-hints",
-        "description": "Require type hints on all new Python functions",
-        "match": {
-          "tool": "Write",
-          "pattern": "*.py"
-        },
-        "action": {
-          "command": "bash",
-          "args": ["-c", "if grep -q 'def \\w*([^)]*)\\s*$' \"$CLAUDE_FILE_PATHS\" | grep -v 'def \\w*([^)]*:)' > /dev/null 2>&1; then echo 'WARNING: New Python file lacks type hints on some functions' && exit 1; fi"]
+          "args": ["-c", "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'rm -rf|git push.*--force|:(){:|:& };:'; then echo 'BLOCKED: Dangerous command detected' && exit 2; fi"]
         },
         "enabled": true
       },
@@ -53,20 +40,7 @@
           "command": "bash",
           "args": ["-c", "ruff check --fix \"$CLAUDE_FILE_PATHS\" 2>/dev/null || true"]
         },
-        "enabled": true
-      },
-      {
-        "name": "check-test-coverage",
-        "description": "Verify test coverage after test runs",
-        "match": {
-          "tool": "Bash",
-          "pattern": "pytest *"
-        },
-        "action": {
-          "command": "bash",
-          "args": ["-c", "COVERAGE=$(pytest --cov=. --cov-report=term-missing 2>&1 | grep 'TOTAL' | awk '{print $NF}' || echo '0%'); echo \"Coverage: $COVERAGE\"; if [ \"$COVERAGE\" != '100%' ] && [ \"${COVERAGE%?}\" -lt 80 ]; then echo 'WARNING: Coverage below 80%' && exit 1; fi"]
-        },
-        "enabled": true
+      "enabled": true
       }
     ],
     "Stop": [

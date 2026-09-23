@@ -115,17 +115,19 @@ def list_tools() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                "tool_calls": {
-                    "type": "string",
-                    "description": "JSON string of tool calls to validate"
-                },
-                "allowed_patterns": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of allowed tool call patterns"
+                        "tool_calls": {
+                            "type": "string",
+                            "description": "JSON string of tool calls to validate"
+                        },
+                        "allowed_patterns": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of allowed tool call patterns"
+                        }
+                    },
+                    "required": ["tool_calls"]
                 }
-            },
-            "required": ["tool_calls"]
+            }
         }
     ]
 
@@ -163,8 +165,10 @@ def security_scan(file_path: str = None, content: str = None) -> dict:
     # Check for SQL injection
     sql_patterns = [
         r'execute\s*\(\s*f["\'].*\{.*\}.*["\']\s*\)',  # f-string SQL
-        r'execute\s*\(\s*["\'].*\+.*["\']\s*\)',  # string concatenation SQL
+        r'execute\s*\(\s*["\'].*\+.*["\']\s*\)',  # string concatenation SQL in execute
         r'cursor\.execute\s*\([^)]*\+',
+        r'= "SELECT.*"\s*\+\s*',  # string concatenation building SQL query
+        r'\+ str\(',  # string concatenation with str() for SQL
     ]
     for pattern in sql_patterns:
         if re.search(pattern, content, re.IGNORECASE):
@@ -197,6 +201,7 @@ def security_scan(file_path: str = None, content: str = None) -> dict:
         r'dangerouslySetInnerHTML',
         r'\.innerHTML\s*=',
         r'document\.write\s*\(',
+        r'f["\']<[^>]*>\{',  # f-string with HTML interpolation
     ]
     for pattern in xss_patterns:
         if re.search(pattern, content, re.IGNORECASE):

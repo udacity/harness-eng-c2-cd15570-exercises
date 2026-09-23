@@ -1,0 +1,54 @@
+{
+  "mcp": {
+    "enforcement": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["${workspace}/solution/enforcement_mcp.py"],
+      "description": "Enforcement tools for security scanning and validation"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "read:*",
+      "grep:*",
+      "glob:*",
+      "list:*"
+    ],
+    "ask": [
+      "edit:*",
+      "bash:*",
+      "webfetch:*",
+      "websearch:*"
+    ],
+    "deny": [
+      "edit:.env*",
+      "edit:*secrets*",
+      "edit:*credentials*",
+      "bash:rm -rf *",
+      "bash:git push * --force",
+      "bash:curl *",
+      "bash:wget *"
+    ]
+  },
+  "hooks": {
+    "pre_command": [
+      {
+        "matcher": "bash",
+        "action": {
+          "type": "command",
+          "command": "bash -c 'if echo \"$GOOGLE_TOOL_INPUT\" | grep -qE \"rm -rf|git push.*--force|:(){ :|:& };\"; then echo \"BLOCKED: Dangerous command\" && exit 2; fi'"
+        }
+      }
+    ],
+    "post_command": [
+      {
+        "matcher": "edit",
+        "action": {
+          "type": "command",
+          "command": "bash -c 'ruff check --fix $GOOGLE_FILE_PATHS 2>/dev/null || true'"
+        }
+      }
+    ]
+  },
+  "description": "Gemini CLI configuration with hooks and permission model for I2.6"
+}
