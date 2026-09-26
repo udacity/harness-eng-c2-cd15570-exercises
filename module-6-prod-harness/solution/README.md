@@ -119,7 +119,11 @@ Before continuing, confirm that:
 
 If either baseline fails, stop here. Check the working directory, dependencies, credentials, model configuration, and Hermes installation, then rerun the baseline tests. Do not modify the supplied skill, hooks, or permission policy to hide a baseline failure.
 
-## Supplied skill
+## Supplied components for Tasks 2 and 3
+
+Do not connect or configure the following components during Task 1. Task 1 verifies the two supplied harnesses in their original, unchanged state. You will add these components to the Python loop in Task 2 and to Hermes in Task 3.
+
+### Skill
 
 The `xyz-api-client` skill tells the agent to:
 
@@ -138,11 +142,11 @@ You must make this same skill available to both agents:
 - load it and add its instructions to the hand-built loop's model context;
 - install or register it through Hermes' skill mechanism.
 
-## Supplied hooks
+### Hooks
 
 Add all three hooks to both harnesses.
 
-### Syntax hook
+#### Syntax hook
 
 Run this hook after the agent writes or edits the client.
 
@@ -153,7 +157,7 @@ It must:
 - prevent invalid code from being accepted as complete; and
 - write a hook event to the run log.
 
-### Repeated-call hook
+#### Repeated-call hook
 
 Run this hook before a tool call.
 
@@ -165,7 +169,7 @@ It must:
 - block the sixth equivalent call; and
 - return a useful error to the agent without crashing the session.
 
-### Completion hook
+#### Completion hook
 
 Run this hook when the agent attempts to finish.
 
@@ -178,11 +182,11 @@ It must:
 
 The hook functions and commands are supplied. You are responsible for attaching them to the correct events in each harness.
 
-## Supplied permission policy
+### Permission policy
 
 Use the same runtime policy for both agents. The policy is **default deny**: anything not explicitly allowed is denied.
 
-### Allowed
+#### Allowed
 
 | Capability | Scope |
 | --- | --- |
@@ -194,7 +198,7 @@ Use the same runtime policy for both agents. The policy is **default deny**: any
 | Behavioral tests | Only the supplied test command in the assigned workspace. |
 | Local API access during tests | Only the configured mock API origin. |
 
-### Denied
+#### Denied
 
 | Capability | Reason |
 | --- | --- |
