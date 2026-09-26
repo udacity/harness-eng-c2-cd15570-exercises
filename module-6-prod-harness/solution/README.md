@@ -1,271 +1,365 @@
-# Production Harnesses with Hermes: The Offline API Connector
+# Production Harnesses: Python Loop versus Hermes
 
-In the previous modules, you built the major parts of an agent harness yourself: the model loop, skills, hooks, permissions, and evaluation. In this module, you will decide which of those responsibilities can move into a production agent harness.
+In this exercise, you will add the same supplied agent components to two different harnesses:
 
-You will use Hermes to run an agent, control its tool access, execute lifecycle hooks, and collect evidence about its behavior. You will then compare those built-in capabilities with equivalent controls written in Python.
+1. a hand-built Python agent loop; and
+2. a Hermes agent deployment.
 
-> **Your goal is to decide where a production harness is sufficient and where application-specific code is still necessary.**
+You will not build either loop or design the components from scratch. Your job is to connect the supplied skill, hooks, and permission policy to each harness, run the same tests and coding task through both, and explain how the integration experience differs.
 
 ## Scenario
 
-You need an agent to write a Python client for the fictional **2026 XYZ API**. This API is newer than the information available to the model, so the agent cannot safely rely on remembered authentication schemes, endpoints, headers, or payload formats.
+An agent must finish an incomplete Python client for the fictional **2026 XYZ API**.
 
-A local mock service represents the current API. It provides:
+The API is newer than the model's training data, so the agent should not guess its authentication, endpoint, header, or request-body requirements. A local mock service provides a health endpoint and current API documentation.
 
-- a health endpoint;
-- a documentation endpoint;
-- a data synchronization operation;
-- deterministic success and error responses.
-
-The exact client specification is intentionally omitted here. The agent must recognize its knowledge gap and discover the specification from the service.
-
-External web access may be denied during the exercise. A denial should not crash the session. The agent should treat it as new information, revise its plan, and use the allowed local documentation instead.
-
-## Run the local API
-
-Open a terminal and start the mock API from the solution directory:
-
-```bash
-cd module-6-prod-harness/solution
-python3 mock_api/server.py
-```
-
-The server listens at:
+Each harness receives a fresh copy of:
 
 ```text
-http://localhost:8080
+starter/src/xyz_api_client.py
 ```
 
-Confirm that it is running from another terminal:
+The file contains an unfinished function:
+
+```python
+def connect_to_xyz_api() -> dict:
+    """Synchronize sample data with the local XYZ API and return its JSON result."""
+```
+
+The agent must use the allowed local documentation, complete the client, and pass the supplied behavioral tests.
+
+You do not complete the client yourself during the measured runs. You configure each harness so its agent can complete the task safely.
+
+## What you receive
+
+| Item | Purpose |
+| --- | --- |
+| Incomplete API client | The coding task that both agents must complete. |
+| Local mock API | Supplies health, documentation, synchronization, and deterministic error responses. |
+| Hand-built Python loop | A working agent loop with extension points for skills, hooks, and permissions. |
+| Hermes deployment | A working Hermes setup that can run the same agent task. |
+| `xyz-api-client` skill | Tells the agent how to discover the current API contract and verify its work. |
+| Syntax hook | Compiles the client after an edit and returns syntax errors to the agent. |
+| Repeated-call hook | Stops the agent after six equivalent tool calls. |
+| Completion hook | Runs the behavioral tests before allowing the agent to finish. |
+| Permission policy | Defines which files, commands, and network destinations the agent may use. |
+| Test suite | Checks component integration, permissions, hooks, and final client behavior. |
+
+All component logic is supplied. You only need to register it at the correct lifecycle point in each harness.
+
+## Your task
+
+Complete the exercise in five tasks:
+
+1. Confirm that both supplied harnesses work before you change them.
+2. Add the supplied components to the hand-built Python loop and run it.
+3. Add the same components to Hermes and run it.
+4. Verify both completed integrations with the shared tests.
+5. Submit a short comparison supported by the captured results.
+
+Use the same model, prompt, starter client, mock API, and tests for both runs.
+
+## Task 1: Confirm both harnesses work
+
+Complete this task **before you add or change any skill, hook, or permission configuration**. Establishing a working baseline prevents you from confusing an environment or model-connection problem with an integration problem introduced later.
+
+Change to the starter directory:
 
 ```bash
-curl http://localhost:8080/health
+cd module-6-prod-harness/exercise-prod-harness-starter
 ```
 
-Keep the server terminal running while you use Hermes or execute the connector. Press `Ctrl+C` in that terminal to stop the server.
+First, run the deterministic baseline tests:
 
-## What you will learn
+```bash
+python3 -m pytest tests/test_harness_baseline.py
+```
 
-By completing this exercise, you will be able to:
+These tests verify that:
 
-1. **Configure a production agent harness.** Define tool access and lifecycle enforcement through Hermes instead of rebuilding the entire agent loop.
-2. **Handle permission denials inside an agent workflow.** Return a clear denial to the agent so it can choose another path.
-3. **Place controls at the correct lifecycle point.** Distinguish permission checks, before-tool hooks, after-tool hooks, and session completion hooks.
-4. **Use deterministic hooks for deterministic rules.** Check Python syntax, unsafe content, and repeated tool calls with code.
-5. **Separate structural checks from behavioral evaluation.** Recognize that valid Python can still call an API incorrectly.
-6. **Compare prebuilt and custom harness components.** Evaluate configuration effort, enforcement, recovery, runtime overhead, and control.
-7. **Use ablations to support architecture decisions.** Remove one component at a time and measure what changes.
+- the hand-built Python loop can start and stop cleanly;
+- the Hermes deployment can start and stop cleanly;
+- both harnesses can load their model configuration;
+- their built-in message and tool-dispatch paths are available; and
+- the starter client has not been modified.
 
-## Why this task needs a harness
+Next, make one minimal live model call through each harness:
 
-The agent can produce a Python file that compiles while still using an outdated API pattern. It might:
+```bash
+python3 run_exercise.py --harness python --smoke-test
+python3 run_exercise.py --harness hermes --smoke-test
+```
 
-- choose an obsolete authentication method;
-- call the wrong endpoint;
-- omit a required version or identity header;
-- send the wrong JSON structure;
-- continue retrying a tool after access has been denied;
-- claim success without running the behavioral tests.
-
-A syntax check can catch malformed Python. It cannot prove that the connector follows the current API contract.
-
-You will combine several forms of evidence:
-
-- permission decisions show which capabilities were available;
-- hook events show which deterministic checks ran;
-- the session trace shows how the agent adapted;
-- behavioral tests show whether the client actually works;
-- a read-only evaluator identifies unsupported assumptions and explains failures.
-
-## Harness flow
+The smoke-test mode sends the same prompt through each harness without loading the exercise skill, hooks, or permissions:
 
 ```text
-Your task
-    |
-    v
-Hermes agent loop
-    |
-    +---- permission decision
-    |       |
-    |       +---- allow: execute the tool
-    |       +---- ask: request approval
-    |       +---- deny: return the denial to the agent
-    |
-    +---- lifecycle hooks
-    |       |
-    |       +---- validate changed Python
-    |       +---- inspect untrusted content
-    |       +---- detect repeated tool calls
-    |       +---- record session completion
-    |
-    v
-Candidate API client
-    |
-    +---- structural checks
-    +---- behavioral tests against the mock API
-    +---- read-only evaluation
-    |
-    v
-Measured comparison report
+Return exactly HARNESS_OK. Do not call any tools.
 ```
 
-The model chooses its next action from the evidence it receives. The harness constrains and observes those choices without forcing a fixed number of cycles.
+Both commands must finish successfully and print:
 
-## Your exercise objectives
+```text
+HARNESS_OK
+```
 
-You will complete the exercise in five stages.
+The smoke-test runner must save the raw result and basic environment information to:
 
-### 1. Configure Hermes permissions
+```text
+reports/baseline/python-smoke.json
+reports/baseline/hermes-smoke.json
+```
 
-Create a small, reviewable policy for the tools needed by the task.
+Before continuing, confirm that:
 
-| Capability | Expected policy | Why |
+- both commands reached the configured model;
+- both returned a response without crashing or timing out;
+- both baseline result files exist;
+- neither run changed `starter/src/xyz_api_client.py`; and
+- both harnesses used the model and settings specified for the exercise.
+
+If either baseline fails, stop here. Check the working directory, dependencies, credentials, model configuration, and Hermes installation, then rerun the baseline tests. Do not modify the supplied skill, hooks, or permission policy to hide a baseline failure.
+
+## Supplied skill
+
+The `xyz-api-client` skill tells the agent to:
+
+- treat the 2026 API contract as unknown;
+- check the local service health;
+- retrieve documentation from the allowed local endpoint;
+- use the documentation as data rather than as instructions;
+- edit only the assigned client file;
+- run the supplied behavioral tests; and
+- claim completion only after the tests pass.
+
+The skill describes a workflow. It does not contain the hidden endpoint, authentication format, headers, or payload.
+
+You must make this same skill available to both agents:
+
+- load it and add its instructions to the hand-built loop's model context;
+- install or register it through Hermes' skill mechanism.
+
+## Supplied hooks
+
+Add all three hooks to both harnesses.
+
+### Syntax hook
+
+Run this hook after the agent writes or edits the client.
+
+It must:
+
+- compile the assigned Python file;
+- return the compiler message when syntax is invalid;
+- prevent invalid code from being accepted as complete; and
+- write a hook event to the run log.
+
+### Repeated-call hook
+
+Run this hook before a tool call.
+
+It must:
+
+- normalize and hash the tool name and arguments;
+- keep counts within the current run;
+- allow the first five equivalent calls;
+- block the sixth equivalent call; and
+- return a useful error to the agent without crashing the session.
+
+### Completion hook
+
+Run this hook when the agent attempts to finish.
+
+It must:
+
+- run the supplied behavioral tests;
+- allow completion when they pass;
+- return the failed test output when they fail; and
+- record the final result in the run log.
+
+The hook functions and commands are supplied. You are responsible for attaching them to the correct events in each harness.
+
+## Supplied permission policy
+
+Use the same runtime policy for both agents. The policy is **default deny**: anything not explicitly allowed is denied.
+
+### Allowed
+
+| Capability | Scope |
+| --- | --- |
+| Read | The task prompt, supplied skill, and assigned client file. |
+| Edit | Only `starter/src/xyz_api_client.py`. |
+| Local health request | Only the exact mock API health URL. |
+| Local documentation request | Only the exact mock API documentation URL. |
+| Syntax check | Only the supplied compile command for the assigned client. |
+| Behavioral tests | Only the supplied test command in the assigned workspace. |
+| Local API access during tests | Only the configured mock API origin. |
+
+### Denied
+
+| Capability | Reason |
+| --- | --- |
+| Public web search or fetch | The exercise must use the supplied local documentation. |
+| Arbitrary URLs, `curl`, or `wget` commands | These could bypass the local-network boundary. |
+| Arbitrary shell or Python commands | These could bypass file and network rules. |
+| Package installation | Dependencies are already supplied. |
+| Reading `mock_api/server.py` | The server source reveals the hidden API contract. |
+| Reading the reference solution or hidden tests | These reveal the expected implementation. |
+| Reading the other harness's workspace | Each harness must complete the task independently. |
+| Writing outside the assigned client | Harness code, configuration, tests, and evidence must remain unchanged. |
+| Destructive commands | They are unnecessary for this task. |
+| Unknown tools or actions | Unspecified capabilities are denied by default. |
+
+Every permission decision must be logged with the harness name, requested capability, allow or deny result, matched rule, and denial reason. Do not log secrets or full documentation responses.
+
+A denial must be returned to the agent as a normal tool result. It must not terminate the agent loop.
+
+## Task 2: Configure the hand-built Python loop
+
+Use the extension points in the supplied loop to:
+
+1. load the `xyz-api-client` skill;
+2. register the syntax hook after client edits;
+3. register the repeated-call hook before tool execution;
+4. register the completion hook before the loop accepts completion;
+5. apply the supplied permission policy before every tool call; and
+6. write skill, hook, permission, and completion events to the run log.
+
+Do not rewrite the loop. Add the supplied components through its existing interfaces.
+
+Run the Python-loop integration tests:
+
+```bash
+python3 -m pytest tests/test_python_loop.py
+```
+
+Then run the API-client task with a fresh starter workspace:
+
+```bash
+python3 run_exercise.py --harness python
+```
+
+Save the generated client and run log.
+
+## Task 3: Configure Hermes
+
+Configure the supplied Hermes deployment to:
+
+1. install or register the same `xyz-api-client` skill;
+2. run the syntax hook after client edits;
+3. run the repeated-call hook before tool execution;
+4. run the completion hook before accepting completion;
+5. enforce the same permission policy; and
+6. capture equivalent skill, hook, permission, and completion events.
+
+Use Hermes' native configuration where possible. If a supplied adapter is required, connect it without changing its behavior.
+
+Run the Hermes integration tests:
+
+```bash
+python3 -m pytest tests/test_hermes.py
+```
+
+Then run the same API-client task from a separate fresh starter workspace:
+
+```bash
+python3 run_exercise.py --harness hermes
+```
+
+Save the generated client and run log.
+
+## Task 4: Verify both harnesses
+
+Run the shared verification suite:
+
+```bash
+python3 -m pytest tests/test_final_results.py
+```
+
+The supplied tests verify that both harnesses:
+
+- loaded the skill;
+- allowed required local operations;
+- denied forbidden operations before execution;
+- returned permission denials without crashing;
+- ran the syntax hook after edits;
+- blocked the sixth repeated tool call;
+- ran the completion hook;
+- produced separate completed clients; and
+- passed the same API behavioral tests.
+
+A harness does not pass merely because its final client works. Its log must also show that the required skill, hooks, and permissions were active.
+
+## Task 5: Compare the harnesses
+
+Submit a short report with this outcome table:
+
+| Evidence | Python loop | Hermes |
 | --- | --- | --- |
-| Read exercise files | Allow | The agent must inspect the task and existing code. |
-| Edit the assigned client | Allow | The agent must implement the connector. |
-| Run Python and the supplied tests | Allow | The agent needs local validation. |
-| Access the local service and documentation | Allow | This is the current source of API truth. |
-| Search or fetch from the public web | Ask or deny for selected runs | This creates the recovery scenario. |
-| Install packages | Ask | Installation changes the environment and may use the network. |
-| Destructive filesystem commands | Deny | They are unnecessary for the task. |
+| Baseline smoke test | Pass or fail | Pass or fail |
+| Integration tests | Pass or fail | Pass or fail |
+| Skill loaded | Evidence from log | Evidence from log |
+| Hook tests | Pass or fail | Pass or fail |
+| Permission tests | Pass or fail | Pass or fail |
+| Final client tests | Pass or fail | Pass or fail |
+| Agent completed task | Yes or no | Yes or no |
 
-Permissions answer whether the agent may use a capability. They do not determine whether the resulting client is correct.
+Then answer these questions:
 
-### 2. Configure lifecycle hooks
+1. How did you register the skill in each harness?
+2. How did you attach hooks to lifecycle events in each harness?
+3. How did you express and enforce the permission policy?
+4. Which harness required more integration code or configuration?
+5. Which harness produced clearer errors and logs?
+6. Which implementation would be easier to maintain, and why?
 
-Implement hooks with distinct responsibilities:
+Support your answers with file references, test output, and run-log events. Do not choose a winner before running both implementations.
 
-1. **Python validation:** compile the client after a write or edit and return any syntax error immediately.
-2. **Untrusted-content guard:** inspect external tool results before the agent treats their contents as instructions or code.
-3. **Repetition gate:** detect equivalent repeated tool calls and stop an unproductive loop after a documented threshold.
-4. **Session record:** capture the final status and hook activity needed for evaluation.
+## Success criteria
 
-Each hook must consume real runtime input and produce an observable result. A placeholder command that only prints a message is not an implemented hook.
+You have completed the exercise when:
 
-### 3. Run the connector task
+- [ ] both baseline harness tests pass before any integration changes;
+- [ ] both live smoke tests return `HARNESS_OK`;
+- [ ] both baseline result files are saved;
+- [ ] the supplied skill is active in the Python loop;
+- [ ] all three hooks are active in the Python loop;
+- [ ] the Python loop enforces the supplied permission policy;
+- [ ] the Python-loop integration tests pass;
+- [ ] the Python-loop agent completes the API client;
+- [ ] the supplied skill is active in Hermes;
+- [ ] all three hooks are active in Hermes;
+- [ ] Hermes enforces the supplied permission policy;
+- [ ] the Hermes integration tests pass;
+- [ ] the Hermes agent completes a separate copy of the API client;
+- [ ] both final clients pass the shared behavioral tests; and
+- [ ] your report explains the implementation differences using captured evidence.
 
-Give the agent the API connector task without supplying the hidden API specification. Observe whether it:
-
-1. recognizes that its API knowledge may be incomplete;
-2. looks for current documentation;
-3. handles an external-access denial;
-4. discovers the allowed local documentation;
-5. implements the client from retrieved evidence;
-6. runs the behavioral tests;
-7. corrects failures using tool and test output;
-8. stops after producing a verified client.
-
-The completed client must include explicit timeouts, structured response handling, and useful error handling. The behavioral tests will verify the exact API contract.
-
-### 4. Compare Hermes with custom Python
-
-Run the same connector task through two harness implementations.
-
-| Approach | Responsibility |
-| --- | --- |
-| Hermes | Provides the agent loop, tool permissions, lifecycle hooks, tool results, and session events. |
-| Hand-built Python | Implements equivalent boundaries directly so you can compare effort and expressiveness. |
-
-Keep the task, starting client, mock API, tests, prompt, and success criteria constant. A useful comparison changes one harness boundary at a time.
-
-Use the comparison to answer questions such as:
-
-- How much code and configuration does each approach require?
-- Does each approach return a usable denial to the agent?
-- Can each approach inspect or transform tool content?
-- Can each approach maintain state across repeated calls?
-- Which approach makes the enforcement trace easier to audit?
-
-### 5. Run controlled ablations
-
-Evaluate these configurations:
-
-| Configuration | Purpose |
-| --- | --- |
-| `hermes-full` | Hermes permissions and hooks are enabled. |
-| `hermes-no-hooks` | Shows what changes when lifecycle enforcement is removed. |
-| `hermes-web-denied` | Tests recovery through allowed local documentation. |
-| `handbuilt-full` | Runs equivalent controls through custom Python. |
-| `unprotected` | Establishes behavior without the harness controls. |
-
-Record the following evidence for every run:
-
-- completion status;
-- behavioral test result;
-- model and tool cycles;
-- permission requests and denials;
-- hook executions and blocks;
-- repeated-call termination;
-- model and wall-clock time when available;
-- final client artifact;
-- evaluator findings.
-
-Measure latency, catch rates, cycles, and evaluator accuracy from the captured runs. Do not insert assumed values into the report.
-
-## Evaluation
-
-### Deterministic checks
-
-The behavioral test suite verifies observable client behavior, including:
-
-- the client exists and imports;
-- the connection function returns structured data;
-- the request reaches the correct operation;
-- authentication and required headers are correct;
-- the request body follows the documented structure;
-- the success response is parsed correctly;
-- documentation discovery uses an allowed source.
-
-These tests are the execution oracle. A plausible explanation from the model cannot turn a failing request into a successful connector.
-
-### Read-only evaluator
-
-The evaluator may inspect:
-
-- the original task;
-- the final client source;
-- behavioral test output;
-- the permission and hook trace;
-- the agent's final explanation.
-
-The evaluator may identify unsupported assumptions, missing evidence, or a mismatch between the source and the agent's claims. It must not edit the client or replace the deterministic test result.
-
-## Completion checklist
-
-- [ ] You can run the connector task through Hermes.
-- [ ] External web denial returns a controlled result instead of crashing the session.
-- [ ] The agent recovers by consulting the allowed local documentation.
-- [ ] The generated client passes every behavioral test.
-- [ ] The syntax hook catches an intentionally malformed edit.
-- [ ] The content guard blocks a known unsafe fixture and permits a safe fixture.
-- [ ] The repetition gate stops equivalent repeated calls at the documented limit.
-- [ ] Session logs identify which permissions and hooks ran.
-- [ ] The hand-built comparison uses the same task and acceptance tests.
-- [ ] The ablation report is generated from captured executions.
-- [ ] Your conclusion explains where Hermes is sufficient and where custom code adds necessary control.
-
-## Discussion questions
-
-1. What should the agent do when it recognizes that its API knowledge may be outdated?
-2. Why should a permission denial be returned to the model instead of ending the process?
-3. Which controls belong before a tool call, after a tool call, or after the session?
-4. Why is successful compilation insufficient evidence that an API connector works?
-5. When does a prebuilt hook reduce maintenance burden?
-6. When does application-specific Python provide meaningfully better control?
-7. How can a repetition gate stop waste without forcing every task to use the same number of cycles?
-8. What evidence would justify keeping or removing each harness component?
-
-## Solution files
+## Expected exercise layout
 
 ```text
-solution/
-├── README.md                     # this exercise guide
-├── .hermes/settings.json         # Hermes hooks and permissions
-├── mock_api/                     # local 2026 XYZ API
-├── src/
-│   └── xyz_api_client_solution.py
-├── handbuilt_permissions.py      # custom harness comparison
-├── run_ablation.py               # controlled experiment runner
-├── tests/                        # behavior and harness checks
-└── reports/                      # generated run evidence
+module-6-prod-harness/
+├── exercise-prod-harness-starter/
+│   ├── task.md
+│   ├── starter/
+│   │   └── src/
+│   │       └── xyz_api_client.py
+│   ├── python_loop/              # supplied hand-built loop
+│   ├── hermes/                   # supplied Hermes deployment
+│   ├── components/
+│   │   ├── skill/                # supplied xyz-api-client skill
+│   │   ├── hooks/                # supplied hook implementations
+│   │   └── permissions/          # supplied policy
+│   ├── tests/                    # supplied integration and behavior tests
+│   ├── run_exercise.py
+│   └── reports/
+└── solution/
+    ├── README.md
+    ├── mock_api/server.py
+    ├── src/xyz_api_client_solution.py
+    ├── handbuilt_permissions.py
+    ├── run_ablation.py
+    ├── tests/
+    └── reports/
 ```
+
+The two measured agents must not have read access to the solution directory or to each other's workspaces.
