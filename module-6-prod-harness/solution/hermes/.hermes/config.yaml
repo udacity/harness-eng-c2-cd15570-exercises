@@ -1,0 +1,19 @@
+plugins:
+  enabled:
+    - xyz-api-harness
+  entries:
+    xyz-api-harness:
+      allow_tool_override: true
+
+platform_toolsets:
+  cli:
+    - xyz-api-harness
+
+skills:
+  project_discovery: false
+
+agent:
+  coding_context: "off"
+  max_turns: 24
+  max_verify_nudges: 5
+  verify_on_stop: false

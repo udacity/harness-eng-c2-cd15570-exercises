@@ -1,5 +1,5 @@
 """
-Mock 2026 XYZ API Server
+2026 XYZ API Server
 
 Simulates the brand-new XYZ API with 2026-standard authentication and endpoints.
 DO NOT MODIFY THIS FILE - it represents the ground truth API specification.
@@ -29,12 +29,20 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
         pass  # Suppress default logging
 
     def send_json_response(self, status_code, data):
+        response_body = json.dumps(data).encode()
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(response_body)))
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        self.wfile.write(response_body)
 
     def do_POST(self):
+        # Always consume the request body before returning a response. Leaving
+        # unread POST data in the socket can cause macOS to reset the connection
+        # while the client is reading an otherwise valid JSON error response.
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length)
+
         if self.path != '/v2/data-sync':
             self.send_json_response(404, {"error": "Not Found"})
             return
@@ -66,9 +74,6 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
             return
 
         # Parse request body
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length)
-
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
@@ -133,7 +138,7 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     server = HTTPServer(('localhost', 8080), XYZAPIHandler)
-    print("Mock 2026 XYZ API Server running on http://localhost:8080")
+    print("2026 XYZ API Server running on http://localhost:8080")
     print("Endpoints:")
     print("  GET  /health       - Health check")
     print("  GET  /api-docs     - API documentation (fetchable)")

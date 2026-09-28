@@ -1,0 +1,5 @@
+name: xyz-api-harness
+version: "1.0.0"
+description: Read-only baseline tools for the XYZ API client exercise.
+capabilities:
+  - tools.override
