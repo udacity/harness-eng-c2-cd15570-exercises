@@ -1,5 +1,25 @@
 # Production Harnesses: Python Loop versus Hermes
 
+## Your assignment
+
+Work through Tasks 1–7 in order. Your coding task is specifically to make the
+supplied skill, hooks, and permission policy available at the correct lifecycle
+boundaries in both harnesses.
+
+The only implementation TODOs are in:
+
+```text
+python/loop/configured_agent_loop.py
+hermes/configured_plugin.py
+```
+
+Do not rewrite the supplied components, API server, runners, baseline
+harnesses, or tests. The incomplete `task/src/xyz_api_client.py` is also
+intentional: you do not complete it by hand. In Task 5, each configured harness
+must give an isolated copy to its own agent and let that agent implement the
+client. You will then use the generated artifacts to compare the harnesses.
+
+
 ## Exercise at a glance
 
 A complete local XYZ API server is supplied and ready to receive data. The missing piece is a Python client function that sends data to its synchronization endpoint. Before writing that function, the agent in each harness must call the API's documentation endpoint to learn the contract.
@@ -149,7 +169,7 @@ All server responses use JSON. Errors contain an `error` field describing the re
 
 ### What must be implemented
 
-A complete XYZ API server is supplied at `solution/api_server/server.py` and runs locally at `http://localhost:8080`. This is one shared server used by both harnesses; there is no separate Python-loop server or Hermes server. The server already implements its health, documentation, and data-synchronization endpoints. You do not need to create an API server, add an endpoint, or change `api_server/server.py`.
+A complete XYZ API server is supplied at `api_server/server.py` and runs locally at `http://localhost:8080`. This is one shared server used by both harnesses; there is no separate Python-loop server or Hermes server. The server already implements its health, documentation, and data-synchronization endpoints. You do not need to create an API server, add an endpoint, or change `api_server/server.py`.
 
 The missing code is on the client side: Python code that sends data to the existing `POST /v2/data-sync` endpoint and returns the server's response.
 
@@ -180,7 +200,7 @@ You do not manually write the missing function during the measured runs. You con
 
 ## What you are given
 
-All of the following are supplied in the `solution/` directory:
+All of the following are supplied in this starter directory:
 
 | Supplied item | What it provides |
 | --- | --- |
@@ -223,22 +243,22 @@ You should configure and connect the supplied code, not rewrite it.
 The run script copies the same incomplete client template into two isolated workspaces:
 
 ```text
-solution/python/runs/src/xyz_api_client.py
-solution/hermes/runs/src/xyz_api_client.py
+python/runs/src/xyz_api_client.py
+hermes/runs/src/xyz_api_client.py
 ```
 
 The Python loop completes the first file. Hermes completes the second file. Each run also creates its own trace and test record:
 
 ```text
-solution/python/runs/run.jsonl
-solution/python/runs/test-results.json
-solution/hermes/runs/run.jsonl
-solution/hermes/runs/test-results.json
+python/runs/run.jsonl
+python/runs/test-results.json
+hermes/runs/run.jsonl
+hermes/runs/test-results.json
 ```
 
 The two source files do not need to be textually identical. They must implement the same required behavior and pass the same tests.
 
-Neither agent may read the other run's workspace or the reference answer at `solution/src/xyz_api_client_solution.py`.
+Neither agent may read the other run's workspace. Each harness must complete its own isolated client copy.
 
 ## Supplied components
 
@@ -246,9 +266,9 @@ Each harness has its own supplied component files. The two sets enforce equivale
 
 | Component | Hand-built Python loop | Hermes |
 | --- | --- | --- |
-| Skill | `solution/python/components/skill/SKILL.md` | `solution/hermes/components/skill/SKILL.md` |
-| Hooks | `solution/python/components/hooks/` | `solution/hermes/components/hooks/` |
-| Permission policy | `solution/python/components/permissions/` | `solution/hermes/components/permissions/` |
+| Skill | `python/components/skill/SKILL.md` | `hermes/components/skill/SKILL.md` |
+| Hooks | `python/components/hooks/` | `hermes/components/hooks/` |
+| Permission policy | `python/components/permissions/` | `hermes/components/permissions/` |
 
 You will connect the Python component set during Task 3 and the Hermes component set during Task 4. Neither harness loads component files from the other harness's directory.
 
@@ -322,17 +342,17 @@ expected localhost request but is not an operating-system network sandbox.
 
 Complete this task before testing or configuring either harness. The API server is a finished dependency. The agents will not implement or modify any of its endpoints.
 
-From the solution directory, start the server in one terminal:
+From the starter directory, start the server in one terminal:
 
 ```bash
-cd module-6-prod-harness/solution
+cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/server.py
 ```
 
 Leave that process running. In a second terminal, run the supplied server tests:
 
 ```bash
-cd module-6-prod-harness/solution
+cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/tests/test_api_server.py
 ```
 
@@ -350,10 +370,10 @@ All these endpoints must already work. The harness agents do not develop `/v2/da
 
 Complete this task before changing any integration code or configuration.
 
-Change to the solution directory:
+Change to the starter directory:
 
 ```bash
-cd module-6-prod-harness/solution
+cd module-6-prod-harness/exercise-prod-harness-starter
 ```
 
 Install the hand-built loop's dependencies and configure its model credentials:
@@ -373,7 +393,7 @@ hermes --version
 hermes config get model --json
 ```
 
-The Hermes runner defaults to `/Users/XXXX/.local/bin/hermes`. If Hermes is
+The Hermes runner defaults to `$HOME/.local/bin/hermes`. If Hermes is
 installed elsewhere, point the runner to it before continuing:
 
 ```bash
@@ -442,9 +462,9 @@ If either baseline fails, stop. Fix the environment, dependencies, credentials, 
 In this task, **you must add Python code** to
 `python/loop/configured_agent_loop.py`. Running the test is not the task by
 itself: the test only verifies the connection code that you write. Your Task 3
-implementation must define the skill, permission, and hook connection classes,
-construct them inside `HandBuiltAgentLoop`, and call them from the correct loop
-boundaries described below.
+implementation must complete the scaffolded skill, permission, and hook
+connection classes, construct them inside `HandBuiltAgentLoop`, and call them
+from the correct loop boundaries described below.
 
 The skill instructions, permission rules, and hook behavior are already
 implemented under `python/components/`. Do not rewrite those components. Your
@@ -457,10 +477,12 @@ logic under `python/components/`, and do not change
 `python/loop/baseline_agent_loop.py`.
 
 The runner already constructs the supplied skill, permission policy, hooks, and
-trace and passes them to `HandBuiltAgentLoop`. Your work is to make those
-components available at the correct loop boundaries.
+trace and passes them to `HandBuiltAgentLoop`. Complete every TODO in
+`configured_agent_loop.py` so those objects become available at the correct
+loop boundaries. Do not add TODOs or implementation changes to the supplied
+component files.
 
-### Add three component-connection classes
+### Complete three component-connection classes
 
 Organize the integration around three explicit classes in
 `configured_agent_loop.py`:
@@ -533,7 +555,7 @@ the loop accepts a final model response.
 
 ### Test only the component connections
 
-Keep the XYZ API server from Task 1 running. From the solution directory, run:
+Keep the XYZ API server from Task 1 running. From the starter directory, run:
 
 ```bash
 python3 -m pytest -s python/tests/test_integration.py
@@ -566,9 +588,9 @@ implements the client and belongs to Task 5.
 In this task, **you must add Python code** to
 `hermes/configured_plugin.py`. Running the test is not the task by itself: the
 test verifies the connection code that you write. Your Task 4 implementation
-must define the skill, permission, and hook connection classes, construct them
-inside `HermesConfiguredPlugin`, and register them at the native Hermes
-lifecycle boundaries described below.
+must complete the scaffolded skill, permission, and hook connection classes,
+construct them inside `HermesConfiguredPlugin`, and register them at the
+native Hermes lifecycle boundaries described below.
 
 Hermes owns its model/tool loop internally, so there is no Hermes loop file to
 copy. The configured plugin is the integration layer that makes the supplied
@@ -576,13 +598,14 @@ components available inside that loop. It is the Hermes equivalent of
 `python/loop/configured_agent_loop.py`.
 
 Task 2 remains available as the unchanged “before” implementation in
-`hermes/baseline_plugin.py`. Make the Task 4 changes only in
+`hermes/baseline_plugin.py`. Complete every TODO only in
 `hermes/configured_plugin.py`. Do not modify the supplied component logic under
 `hermes/components/`, and do not change `hermes/baseline_plugin.py`. The native
-plugin entry point already selects the baseline adapter for `--smoke-test` and
-the configured adapter for configured runs.
+plugin entry point, manifest, runtime configuration, tool implementations, and
+runner are supplied. They already select the baseline adapter for
+`--smoke-test` and the configured adapter for configured runs.
 
-### Add three component-connection classes
+### Complete three component-connection classes
 
 Organize the integration around three explicit classes in
 `configured_plugin.py`:
@@ -653,7 +676,7 @@ capability being executed.
 
 ### Test only the component connections
 
-Keep the XYZ API server from Task 1 running. From the solution directory, run:
+Keep the XYZ API server from Task 1 running. From the starter directory, run:
 
 ```bash
 python3 -m pytest -vv -s hermes/tests/test_integration.py
@@ -721,7 +744,7 @@ The two harnesses use the same supplied local server. If it is not already
 running, start it in a separate terminal and leave that terminal open:
 
 ```bash
-cd module-6-prod-harness/solution
+cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/server.py
 ```
 
@@ -729,7 +752,7 @@ From the terminal where you will run the harnesses, confirm the server is
 healthy:
 
 ```bash
-cd module-6-prod-harness/solution
+cd module-6-prod-harness/exercise-prod-harness-starter
 curl http://localhost:8080/health
 ```
 
@@ -738,7 +761,7 @@ fails.
 
 ### Run the hand-built Python harness
 
-From the solution directory, run:
+From the starter directory, run:
 
 ```bash
 python3 python/run_exercise.py --fresh
@@ -769,7 +792,7 @@ Wait for this command to finish before starting Hermes.
 
 ### Run the configured Hermes harness
 
-From the same solution directory, run:
+From the same starter directory, run:
 
 ```bash
 python3 hermes/run_exercise.py --fresh
@@ -840,9 +863,8 @@ These commands make real model-provider calls and may take several minutes.
 Their prompts, skill instructions, tool requests and results, and assigned
 client contents are sent to the configured providers.
 
-Do not edit either generated client by hand. Do not copy a completed client
-from one run into the other, and do not copy the maintainer implementation from
-`src/xyz_api_client_solution.py`. The purpose of Task 5 is to observe each
+Do not edit either generated client by hand, and do not copy a completed
+client from one run into the other. The purpose of Task 5 is to observe each
 harness completing the same task independently.
 
 ### Confirm both runs completed
@@ -865,9 +887,8 @@ For Hermes, a successful terminal summary must contain:
 
 Before that summary, the live output must show a successful `write_file`, a
 passing `syntax_check`, a passing `run_tests` result, and
-`HERMES COMPLETION CHECK — COMPLETED`. The generated implementation does not
-need to be textually identical to `src/xyz_api_client_solution.py`; it must
-satisfy the same behavioral contract.
+`HERMES COMPLETION CHECK — COMPLETED`. The two generated implementations do not need to be textually identical;
+each one must satisfy the same behavioral contract.
 
 The Python runner must likewise report `"status": "completed"` after its
 completion hook passes. If a run fails or times out, inspect that harness's
@@ -879,7 +900,7 @@ want to replace its successful client and evidence.
 
 ## Task 6: Test the results
 
-Run each harness's complete supplied test suite from the solution directory:
+Run each harness's complete supplied test suite from the starter directory:
 
 ```bash
 python3 -m pytest python/tests
@@ -915,16 +936,16 @@ hermes/runs/test-results.json
 After both harnesses and both test suites pass, create:
 
 ```text
-solution/harness-comparison.md
+harness-comparison.md
 ```
 
 This file is your final written exercise deliverable. It is not supplied in advance and is not created by either agent. You write it after reviewing the two generated clients, test results, run traces, and integration code.
 
-The file is stored at the root of `solution/` because it compares both harnesses. Harness-specific evidence remains in:
+Store the file at the root of the starter directory because it compares both harnesses. Harness-specific evidence remains in:
 
 ```text
-solution/python/runs/
-solution/hermes/runs/
+python/runs/
+hermes/runs/
 ```
 
 Use these artifacts as evidence:
@@ -965,11 +986,11 @@ would be easier to maintain.
 
 Do not support that conclusion with line count alone. Use the passing results plus the number of integration points, custom state, configuration steps, and application-owned boundaries.
 
-## Final solution acceptance criteria
+## Final exercise acceptance criteria
 
-The solution is complete when:
+The exercise is complete when:
 
-- [ ] all work and generated artifacts are under `module-6-prod-harness/solution/`;
+- [ ] all work and generated artifacts are under `module-6-prod-harness/exercise-prod-harness-starter/`;
 - [ ] the complete supplied API server passes `python3 api_server/tests/test_api_server.py` before either harness is configured;
 - [ ] both untouched harnesses pass the baseline checks;
 - [ ] the components under `python/components/` are connected to the Python loop;
@@ -982,13 +1003,13 @@ The solution is complete when:
 - [ ] the comparison report uses captured evidence; and
 - [ ] the comparison explains the observed difference in integration work.
 
-## Solution directory layout
+## Starter directory layout
 
-All active work belongs in this directory:
+Keep all of your work and generated evidence in this starter directory:
 
 ```text
 module-6-prod-harness/
-└── solution/
+└── exercise-prod-harness-starter/
     ├── README.md
     ├── task/
     │   └── src/
@@ -1044,7 +1065,5 @@ module-6-prod-harness/
     │   ├── server.py
     │   └── tests/
     │       └── test_api_server.py          # verifies every supplied endpoint
-    ├── src/
-    │   └── xyz_api_client_solution.py     # maintainer reference answer
     └── harness-comparison.md               # your final cross-harness report
 ```

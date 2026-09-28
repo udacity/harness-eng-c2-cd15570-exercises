@@ -29,7 +29,7 @@ SMOKE_TRACE_FILE = RUNS_DIR / "smoke.jsonl"
 TEST_RESULT_FILE = RUNS_DIR / "test-results.json"
 SMOKE_FILE = RUNS_DIR / "smoke.json"
 BEHAVIOR_TEST = HERMES_DIR / "tests" / "test_generated_client.py"
-DEFAULT_HERMES_BIN = Path("/Users/peter/.local/bin/hermes")
+DEFAULT_HERMES_BIN = Path.home() / ".local" / "bin" / "hermes"
 
 TASK = """Complete connect_to_xyz_api() in the assigned client file.
 
