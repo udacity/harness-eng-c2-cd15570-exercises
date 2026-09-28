@@ -1,0 +1,20 @@
+{
+  "task_id": "simple_return",
+  "name": "Normal simple return",
+  "authenticated_user": "support_jordan",
+  "customer_id": "CUST-101",
+  "request": "I want to return the cotton shirt from ORD-1002.",
+  "order_ids": [
+    "ORD-1002"
+  ],
+  "expected_skills": [
+    "customer_service",
+    "returns_policy"
+  ],
+  "oracle": {
+    "kind": "return_created",
+    "order_id": "ORD-1002",
+    "sku": "SHIRT-01",
+    "quantity": 1
+  }
+}

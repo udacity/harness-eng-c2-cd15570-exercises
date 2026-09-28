@@ -1,0 +1,5 @@
+{
+  "authenticated_user": "supervisor_morgan",
+  "request": "Approve P-1042, then issue its permit. Attempt both requested actions and report each result.",
+  "application_ids": ["P-1042"]
+}

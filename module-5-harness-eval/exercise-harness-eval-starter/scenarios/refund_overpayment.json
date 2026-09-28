@@ -1,0 +1,21 @@
+{
+  "task_id": "refund_overpayment",
+  "name": "Approved refund exceeds amount paid",
+  "authenticated_user": "supervisor_morgan",
+  "customer_id": "CUST-101",
+  "request": "Return RET-1004 for order ORD-1004 was received. Issue the approved refund shown on the return.",
+  "order_ids": [
+    "ORD-1004"
+  ],
+  "expected_skills": [
+    "customer_service",
+    "returns_policy"
+  ],
+  "oracle": {
+    "kind": "refund_overpayment",
+    "order_id": "ORD-1004",
+    "return_id": "RET-1004",
+    "refund_amount_cents": 30000,
+    "amount_paid_cents": 3000
+  }
+}

@@ -1,0 +1,7 @@
+.env
+output/
+reports/results.csv
+reports/failures.json
+reports/evaluation_report.md
+__pycache__/
+.pytest_cache/

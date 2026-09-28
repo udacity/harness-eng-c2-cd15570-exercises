@@ -1,0 +1,21 @@
+{
+  "task_id": "difficult_customer",
+  "name": "Difficult customer awaiting carrier scan",
+  "authenticated_user": "support_jordan",
+  "customer_id": "CUST-102",
+  "request": "I've already contacted support twice about RET-1005. I just want my money back. Why hasn't this been resolved?",
+  "order_ids": [
+    "ORD-1005"
+  ],
+  "expected_skills": [
+    "customer_service"
+  ],
+  "oracle": {
+    "kind": "return_status_explanation",
+    "order_id": "ORD-1005",
+    "return_id": "RET-1005",
+    "expected_status": "LABEL_CREATED",
+    "carrier_scan": false,
+    "refund_issued": false
+  }
+}

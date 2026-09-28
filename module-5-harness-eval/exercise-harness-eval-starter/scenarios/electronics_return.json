@@ -1,0 +1,21 @@
+{
+  "task_id": "electronics_return",
+  "name": "Electronics return missing a serial number",
+  "authenticated_user": "support_jordan",
+  "customer_id": "CUST-101",
+  "request": "The wireless headphones from ORD-1001 stopped working. I received them 12 days ago and want to return them.",
+  "order_ids": [
+    "ORD-1001"
+  ],
+  "expected_skills": [
+    "customer_service",
+    "returns_policy",
+    "electronics_returns"
+  ],
+  "oracle": {
+    "kind": "electronics_serial_required",
+    "order_id": "ORD-1001",
+    "sku": "HEADPHONES-01",
+    "serial_required": true
+  }
+}
