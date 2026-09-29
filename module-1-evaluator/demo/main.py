@@ -7,10 +7,13 @@ import traceback
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from harness.loops import run_basic, run_external, run_self
+from harness.clients import ScriptedClient, TimedClient
+from harness.loops.basic_loop import run_basic_loop
+from harness.loops.external_evaluation_loop import run_external_evaluation_loop
+from harness.loops.self_evaluation_loop import run_self_evaluation_loop
 from harness.models import RunResult, Scenario
-from harness.providers import LiveProvider, Provider, ScriptedProvider
 from harness.run_log import tee_run_output
 from harness.scenario import authoritative_context, load_scenario, requirements_context
 
@@ -19,9 +22,9 @@ BASE_DIR = Path(__file__).parent
 DEFAULT_SCENARIO = BASE_DIR / "scenarios" / "inc_2048.json"
 OUTPUT_DIR = BASE_DIR / "output"
 RUNNERS: dict[str, Callable[..., RunResult]] = {
-    "basic": run_basic,
-    "self": run_self,
-    "external": run_external,
+    "basic": run_basic_loop,
+    "self": run_self_evaluation_loop,
+    "external": run_external_evaluation_loop,
 }
 
 
@@ -60,9 +63,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_provider(kind: str, model_override: str | None) -> tuple[Provider, str, str]:
+def create_client(
+    kind: str, model_override: str | None, mode: str
+) -> tuple[Any, str, str, str]:
     if kind == "scripted":
-        return ScriptedProvider(), "scripted-fixture", "local"
+        self_verdicts = [False, True] if mode == "self" else None
+        return (
+            ScriptedClient(self_verdicts=self_verdicts),
+            "scripted-fixture",
+            "local",
+            "scripted",
+        )
 
     from dotenv import load_dotenv
     from openai import OpenAI
@@ -77,7 +88,8 @@ def create_provider(kind: str, model_override: str | None) -> tuple[Provider, st
     base_url = os.getenv(
         "OPENAI_BASE_URL", "https://openai.vocareum.com/v1"
     ).strip()
-    return LiveProvider(OpenAI(base_url=base_url, api_key=api_key), model), model, base_url
+    client = TimedClient(OpenAI(base_url=base_url, api_key=api_key))
+    return client, model, base_url, "live"
 
 
 def pause_callback(enabled: bool) -> Callable[[], None]:
@@ -115,14 +127,16 @@ def run_modes(args: argparse.Namespace, scenario: Scenario) -> list[RunResult]:
     pause = pause_callback(args.pause)
 
     for mode in modes:
-        provider, model, endpoint = create_provider(args.provider, args.model)
+        client, model, endpoint, provider_name = create_client(
+            args.provider, args.model, mode
+        )
         print("\n============================================================")
         print(f"{mode.upper()} LOOP")
         print("============================================================")
-        print(f"Provider: {provider.name}")
+        print(f"Provider: {provider_name}")
         print(f"Model: {model}")
         print(f"Endpoint: {endpoint}")
-        result = RUNNERS[mode](provider, scenario, pause=pause)
+        result = RUNNERS[mode](client, model, scenario, pause=pause)
         results.append(result)
         print("\nRUN SUMMARY")
         print(f"Attempts: {len(result.attempts)}")

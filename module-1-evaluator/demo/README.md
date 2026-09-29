@@ -35,7 +35,7 @@ Recovery confirmed:     false
 Authenticated user:     Sam Rivera, support_engineer
 ```
 
-The generator must write 45–90 words, include `INC-2048`, use only confirmed
+The generator must write exactly 60 words, include `INC-2048`, use only confirmed
 facts, avoid unsupported action or recovery claims, and provide a useful next
 diagnostic step.
 
@@ -50,10 +50,11 @@ python3 main.py compare
 ```
 
 The scripted initial response falsely says the incident was resolved and a
-rollback succeeded. Its same-conversation self-review incorrectly returns
-`PASS`. The external loop applies Python checks and a fresh inferential review
-to that exact candidate, reports a self-evaluation false positive, returns the
-feedback to the generator, and accepts the corrected second response.
+rollback succeeded. In `self`, the scripted reviewer first returns `FAIL`, the
+generator revises from that review response, and the second review passes. In
+`external`, self-review incorrectly returns `PASS` for the flawed first draft;
+Python checks and a fresh inferential review inspect that exact candidate,
+report the false positive, and drive a corrected second response.
 
 Run a single mode when presenting one stage:
 
@@ -101,17 +102,35 @@ live drafts.
 Python performs the criteria that do not need model judgment:
 
 - the exact `INC-2048` identifier is present; and
-- the response contains 45–90 whitespace-separated words.
+- `len(candidate.split()) == 60`.
 
 A fresh evaluator judges:
 
 - factual grounding against the complete authoritative snapshot; and
 - whether the proposed next step is useful and safe.
 
-Missing or malformed evaluator fields fail closed. The external decision passes
+Missing or malformed named decisions fail closed. The external decision passes
 only when both Python checks and both inferential criteria pass. Inferential
 evaluation can still be wrong, so the terminal shows the candidate, raw review,
 and criterion comparison rather than hiding them behind one score.
+
+## Conversation boundaries
+
+The loops call `client.responses.create(...)` directly, just as the exercise
+does. The terminal prints the exact continuation rule at every stage:
+
+```text
+Initial generation: no previous_response_id
+Self-review:        previous_response_id=candidate.id
+Self revision:      previous_response_id=self_review.id
+External review:    no previous_response_id
+External revision:  previous_response_id=candidate.id
+```
+
+The self revision continues through the review because that review belongs to
+the generator conversation. The independent evaluator starts fresh so it does
+not inherit the generator's reasoning. External feedback returns to the
+candidate branch rather than continuing the evaluator's separate conversation.
 
 ## Deterministic tests
 
@@ -121,10 +140,10 @@ The tests use only the scripted provider and require no API key:
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-They verify the stable incident contract, deterministic checks, fail-closed
-review parsing, basic loop semantics, the intentional self-review false
-positive, review of the same candidate, feedback-driven revision, and the
-external stopping decision.
+They verify the stable incident contract, exact Python checks, fail-closed
+result parsing, basic loop semantics, the intentional self-review false
+positive, review of the same candidate, every `previous_response_id` boundary,
+feedback-driven revision, and the external stopping decision.
 
 ## What to show during the demo
 
@@ -136,16 +155,43 @@ external stopping decision.
 6. End on the comparison table: loop completion and response quality are not
    the same measurement.
 
+The scripted false positive is deliberately guaranteed so this teaching moment
+is reliable. It is not a prediction about the exercise. Exercise runs use live
+model output, and students must report the result they observe rather than
+altering inputs to manufacture a disagreement.
+
+## From this demo to the exercise
+
+The domain changes from an incident update to customer-support replies, but the
+implementation task has the same shape:
+
+| Demo code | Exercise task |
+| --- | --- |
+| `passed()` | Parse an explicit self-evaluator `VERDICT`, failing closed when absent. |
+| `evaluate_own_response()` | Continue the generator conversation with `previous_response_id=response.id`. |
+| `evaluate_deterministic_criteria()` | Count words with `split()` and find the exact case identifier in Python. |
+| `evaluate_inferential_criteria()` | Start a fresh evaluator conversation for the judgment-based criteria. |
+| `run_self_evaluation_loop()` | Review, revise from the review response, and stop on self `PASS` or the limit. |
+| `run_external_evaluation_loop()` | Evaluate the same candidate on both paths, compare criteria, revise from external feedback, and stop on independent `PASS` or the limit. |
+
+In the exercise, the exact deterministic requirement is 100 words rather than
+60, `CASE-####` replaces `INC-####`, and five cases are processed. The
+evaluator boundaries and loop responsibilities remain the same.
+
 ## Repository map
 
 ```text
 demo/
 ├── main.py                    # CLI, provider setup, summaries, and logging
 ├── harness/
-│   ├── evaluation.py          # deterministic checks and strict review parser
-│   ├── loops.py               # basic, self, and external evaluator loops
-│   ├── models.py              # provider-neutral evidence structures
-│   ├── providers.py           # deterministic fixture and live Responses API
+│   ├── clients.py             # scripted client and live timing adapter
+│   ├── generator.py           # shared prompt and initial Responses API call
+│   ├── loops/
+│   │   ├── basic_loop.py
+│   │   ├── self_evaluation_loop.py
+│   │   └── external_evaluation_loop.py
+│   ├── models.py              # evidence structures
+│   ├── results.py             # token, time, and run summaries
 │   ├── run_log.py             # timestamped terminal log
 │   └── scenario.py            # scenario loading and prompt context
 ├── scenarios/

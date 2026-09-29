@@ -20,8 +20,7 @@
     "recovery_confirmed": false
   },
   "response_requirements": {
-    "minimum_words": 45,
-    "maximum_words": 90,
+    "required_word_count": 60,
     "required_incident_id": "INC-2048",
     "inferential_criteria": [
       "Use only confirmed incident facts and distinguish facts from hypotheses.",

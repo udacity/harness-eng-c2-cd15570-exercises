@@ -19,51 +19,15 @@ class Scenario:
         return str(self.incident["incident_id"])
 
 
-@dataclass(frozen=True, slots=True)
-class ModelReply:
-    """Provider-neutral text response and measured API usage."""
-
-    response_id: str
-    text: str
-    input_tokens: int = 0
-    output_tokens: int = 0
-    model_seconds: float = 0.0
-
-    @property
-    def total_tokens(self) -> int:
-        return self.input_tokens + self.output_tokens
-
-
-@dataclass(frozen=True, slots=True)
-class CheckResult:
-    """One deterministic evaluation result."""
-
-    name: str
-    passed: bool
-    detail: str
-
-
-@dataclass(frozen=True, slots=True)
-class Review:
-    """Parsed model-evaluator output."""
-
-    criteria: dict[str, bool]
-    verdict: bool
-    feedback: str
-    raw_text: str
-
-
 @dataclass(slots=True)
 class Attempt:
     """All evidence associated with one candidate response."""
 
     number: int
-    candidate: ModelReply
-    self_reply: ModelReply | None = None
-    self_review: Review | None = None
-    deterministic_checks: list[CheckResult] = field(default_factory=list)
-    external_reply: ModelReply | None = None
-    external_review: Review | None = None
+    candidate: Any
+    self_evaluation: Any | None = None
+    deterministic_results: list[str] = field(default_factory=list)
+    external_evaluation: Any | None = None
     independent_passed: bool | None = None
 
 

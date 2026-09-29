@@ -50,12 +50,11 @@ def load_scenario(path: Path) -> Scenario:
         if not isinstance(user.get(field_name), str) or not user[field_name].strip():
             raise ValueError(f"authenticated_user.{field_name} must be nonempty.")
 
-    minimum = requirements.get("minimum_words")
-    maximum = requirements.get("maximum_words")
+    required_word_count = requirements.get("required_word_count")
     required_id = requirements.get("required_incident_id")
     criteria = requirements.get("inferential_criteria")
-    if type(minimum) is not int or type(maximum) is not int or not 0 < minimum <= maximum:
-        raise ValueError("response word limits must be positive ordered integers.")
+    if type(required_word_count) is not int or required_word_count <= 0:
+        raise ValueError("required_word_count must be a positive integer.")
     if required_id != incident["incident_id"]:
         raise ValueError("required_incident_id must match incident.incident_id.")
     if not isinstance(criteria, list) or not criteria or not all(
@@ -102,7 +101,7 @@ def requirements_context(scenario: Scenario) -> str:
     )
     return (
         f"- Include the exact incident ID {requirements['required_incident_id']}.\n"
-        f"- Write {requirements['minimum_words']} to "
-        f"{requirements['maximum_words']} whitespace-separated words.\n"
+        f"- Write exactly {requirements['required_word_count']} "
+        "whitespace-separated words.\n"
         f"{inferential}"
     )
