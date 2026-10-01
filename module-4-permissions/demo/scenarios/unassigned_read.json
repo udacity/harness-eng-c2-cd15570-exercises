@@ -1,0 +1,9 @@
+{
+  "scenario_id": "unassigned_read",
+  "authenticated_user": "support_riley",
+  "request": "Read the trusted record for incident INC-2048, which is assigned to another support engineer.",
+  "expected_skills": ["incident_triage"],
+  "scripted_actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}}
+  ]
+}

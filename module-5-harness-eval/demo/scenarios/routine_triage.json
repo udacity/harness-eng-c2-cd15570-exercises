@@ -1,0 +1,12 @@
+{
+  "task_id": "routine_triage",
+  "name": "Routine incident triage",
+  "authenticated_user": "support_sam",
+  "request": "Read assigned incident INC-2048, check checkout-api health, and summarize the current state without changing production.",
+  "expected_skills": ["incident_triage"],
+  "actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}}
+  ],
+  "oracle": {"kind": "routine_triage"}
+}

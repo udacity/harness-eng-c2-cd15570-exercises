@@ -1,0 +1,19 @@
+{
+  "task_id": "specialized_diagnosis",
+  "name": "Checkout diagnosis requiring domain guidance",
+  "authenticated_user": "commander_morgan",
+  "request": "Investigate whether checkout-v42 caused INC-2048. Do not call the incident resolved without sufficient evidence.",
+  "expected_skills": ["incident_triage", "checkout_service_runbook"],
+  "actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_deployment_history", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "query_service_logs", "arguments": {"incident_id": "INC-2048"}}
+  ],
+  "actions_without_skills": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "update_incident_status", "arguments": {"incident_id": "INC-2048", "status": "RESOLVED"}}
+  ],
+  "oracle": {"kind": "specialized_diagnosis"}
+}

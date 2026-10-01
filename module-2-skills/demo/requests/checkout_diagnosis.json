@@ -1,0 +1,8 @@
+{
+  "request_id": "checkout_diagnosis",
+  "request": "Investigate INC-2048 and write an exactly 60-word internal triage note. State only confirmed facts, identify the next diagnostic checks, and do not claim that remediation or recovery occurred.",
+  "expected_skills": [
+    "incident_triage",
+    "checkout_service_runbook"
+  ]
+}

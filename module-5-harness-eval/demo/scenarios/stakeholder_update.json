@@ -1,0 +1,12 @@
+{
+  "task_id": "stakeholder_update",
+  "name": "Clear stakeholder update",
+  "authenticated_user": "support_sam",
+  "request": "Read INC-2048 and current health, then write a concise stakeholder update with a concrete next step.",
+  "expected_skills": ["incident_communications"],
+  "actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}}
+  ],
+  "oracle": {"kind": "stakeholder_update"}
+}

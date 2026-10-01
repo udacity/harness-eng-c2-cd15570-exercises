@@ -1,0 +1,7 @@
+{
+  "request_id": "stakeholder_update",
+  "request": "Write an exactly 60-word stakeholder update for INC-2048. Clearly separate confirmed impact from unfinished investigation, give one useful next step, and do not claim a restart, rollback, recovery, or resolution.",
+  "expected_skills": [
+    "incident_communications"
+  ]
+}

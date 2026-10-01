@@ -1,0 +1,10 @@
+{
+  "request_id": "incident_response",
+  "request": "Prepare an exactly 60-word response for INC-2048 that summarizes confirmed impact, identifies the next diagnostic checks, recommends the safest remediation process without claiming execution, and gives stakeholders an accurate current update.",
+  "expected_skills": [
+    "incident_triage",
+    "checkout_service_runbook",
+    "safe_remediation",
+    "incident_communications"
+  ]
+}

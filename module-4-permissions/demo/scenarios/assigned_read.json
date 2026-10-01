@@ -1,0 +1,9 @@
+{
+  "scenario_id": "assigned_read",
+  "authenticated_user": "support_sam",
+  "request": "Read the trusted record for assigned incident INC-2048 and summarize its current state.",
+  "expected_skills": ["incident_triage"],
+  "scripted_actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}}
+  ]
+}

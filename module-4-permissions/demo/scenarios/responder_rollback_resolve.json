@@ -1,0 +1,14 @@
+{
+  "scenario_id": "responder_rollback_resolve",
+  "authenticated_user": "responder_jordan",
+  "request": "Investigate INC-2048, request rollback to checkout-v41, then request RESOLVED status. Treat each result independently and do not claim recovery.",
+  "expected_skills": ["incident_triage", "safe_remediation"],
+  "scripted_actions": [
+    {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "get_deployment_history", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "query_service_logs", "arguments": {"incident_id": "INC-2048"}},
+    {"tool": "rollback_deployment", "arguments": {"incident_id": "INC-2048", "target_version": "checkout-v41"}},
+    {"tool": "update_incident_status", "arguments": {"incident_id": "INC-2048", "status": "RESOLVED"}}
+  ]
+}
