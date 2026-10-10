@@ -9,11 +9,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from harness.clients import ScriptedClient, TimedClient
+from dotenv import load_dotenv
+from openai import OpenAI
+
+from harness.clients import TimedClient
 from harness.loops.basic_loop import run_basic_loop
 from harness.loops.external_evaluation_loop import run_external_evaluation_loop
 from harness.loops.self_evaluation_loop import run_self_evaluation_loop
 from harness.models import RunResult, Scenario
+from harness.pauses import pause_after_cycle, pause_after_loop_start
 from harness.run_log import tee_run_output
 from harness.scenario import authoritative_context, load_scenario, requirements_context
 
@@ -40,12 +44,6 @@ def parse_args() -> argparse.Namespace:
         help="Loop to run; compare runs all three in order (default: compare).",
     )
     parser.add_argument(
-        "--provider",
-        choices=["scripted", "live"],
-        default="scripted",
-        help="Use deterministic responses or a live model (default: scripted).",
-    )
-    parser.add_argument(
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO,
@@ -53,53 +51,23 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        help="Override OPENAI_MODEL for a live run.",
-    )
-    parser.add_argument(
-        "--pause",
-        action="store_true",
-        help="Wait for Return after every model/evaluation cycle.",
+        help="Override OPENAI_MODEL for this run.",
     )
     return parser.parse_args()
 
 
-def create_client(
-    kind: str, model_override: str | None, mode: str
-) -> tuple[Any, str, str, str]:
-    if kind == "scripted":
-        self_verdicts = [False, True] if mode == "self" else None
-        return (
-            ScriptedClient(self_verdicts=self_verdicts),
-            "scripted-fixture",
-            "local",
-            "scripted",
-        )
-
-    from dotenv import load_dotenv
-    from openai import OpenAI
-
+def create_llm_client(model_override: str | None) -> tuple[Any, str, str]:
+    """Create the same Vocareum OpenAI client used by the Module 1 solution."""
     load_dotenv(BASE_DIR / ".env")
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise SystemExit(
-            f"Set OPENAI_API_KEY in {BASE_DIR / '.env'} before using --provider live."
+            f"Set OPENAI_API_KEY in {BASE_DIR / '.env'} before running the demo."
         )
     model = model_override or os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip()
-    base_url = os.getenv(
-        "OPENAI_BASE_URL", "https://openai.vocareum.com/v1"
-    ).strip()
+    base_url = "https://openai.vocareum.com/v1"
     client = TimedClient(OpenAI(base_url=base_url, api_key=api_key))
-    return client, model, base_url, "live"
-
-
-def pause_callback(enabled: bool) -> Callable[[], None]:
-    if not enabled:
-        return lambda: None
-
-    def pause() -> None:
-        input("\nCycle complete. Press Return to continue...")
-
-    return pause
+    return client, model, base_url
 
 
 def print_scenario(scenario: Scenario) -> None:
@@ -112,7 +80,6 @@ def print_scenario(scenario: Scenario) -> None:
         "Trusted user context: "
         f"{user['name']} ({user['user_id']}), role={user['role']}"
     )
-    print("Note: authorization is not enforced until the Module 4 demo.")
     print("\nAUTHORITATIVE INCIDENT FACTS")
     print(authoritative_context(scenario))
     print("\nOPERATOR REQUEST")
@@ -121,22 +88,24 @@ def print_scenario(scenario: Scenario) -> None:
     print(requirements_context(scenario))
 
 
-def run_modes(args: argparse.Namespace, scenario: Scenario) -> list[RunResult]:
+def run_modes(
+    args: argparse.Namespace,
+    scenario: Scenario,
+    client: Any,
+    model: str,
+    endpoint: str,
+) -> list[RunResult]:
     modes = ["basic", "self", "external"] if args.mode == "compare" else [args.mode]
     results: list[RunResult] = []
-    pause = pause_callback(args.pause)
 
     for mode in modes:
-        client, model, endpoint, provider_name = create_client(
-            args.provider, args.model, mode
-        )
         print("\n============================================================")
         print(f"{mode.upper()} LOOP")
         print("============================================================")
-        print(f"Provider: {provider_name}")
         print(f"Model: {model}")
-        print(f"Endpoint: {endpoint}")
-        result = RUNNERS[mode](client, model, scenario, pause=pause)
+        print(f"API endpoint: {endpoint}")
+        pause_after_loop_start(mode)
+        result = RUNNERS[mode](client, model, scenario, pause=pause_after_cycle)
         results.append(result)
         print("\nRUN SUMMARY")
         print(f"Attempts: {len(result.attempts)}")
@@ -188,13 +157,14 @@ def print_comparison(results: list[RunResult]) -> None:
 def main() -> None:
     args = parse_args()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    log_path = OUTPUT_DIR / f"{args.mode}-{args.provider}-{timestamp}.log"
+    log_path = OUTPUT_DIR / f"{args.mode}-live-{timestamp}.log"
     with tee_run_output(log_path):
         print(f"Run output saved to: {log_path}")
         try:
             scenario = load_scenario(args.scenario)
+            client, model, endpoint = create_llm_client(args.model)
             print_scenario(scenario)
-            results = run_modes(args, scenario)
+            results = run_modes(args, scenario, client, model, endpoint)
             print_comparison(results)
         except KeyboardInterrupt:
             print("\nRun interrupted.", file=sys.stderr)

@@ -1,0 +1,100 @@
+# Module 6: production harness requirements
+#
+# IMPORTANT
+# =========
+# A Python requirements file can install only Python packages. It cannot
+# install Git, Node.js, a C/C++ compiler, or Hermes's system-level runtime.
+# Install the system prerequisites and Hermes first, then install the Python
+# packages at the bottom of this file.
+#
+# The official Hermes installer manages its own runtime (currently Python
+# 3.14), so it does not conflict with the virtual environment used by the
+# course exercise.
+#
+# ---------------------------------------------------------------------------
+# 1. SYSTEM PREREQUISITES
+# ---------------------------------------------------------------------------
+#
+# Debian / Ubuntu / WSL2:
+#   sudo apt update
+#   sudo apt install -y git curl xz-utils build-essential
+#
+# Fedora / RHEL:
+#   sudo dnf install -y git curl xz gcc-c++ make
+#
+# macOS:
+#   xcode-select --install
+#
+# Windows 10/11:
+#   Use the official PowerShell installer in section 2. It installs the
+#   supported Hermes runtime, including portable Git Bash when needed.
+#   To build native C/C++ modules from source, additionally install Visual
+#   Studio Build Tools with the "Desktop development with C++" workload:
+#   https://visualstudio.microsoft.com/visual-cpp-build-tools/
+#
+# C/C++ compiler requirement:
+#   Treat a native compiler toolchain as a required system prerequisite for
+#   this module, especially in the minimal Udacity Linux environment. Hermes
+#   installs from source, and some dependencies may need to compile native
+#   code when a compatible prebuilt package is unavailable. On Debian/Ubuntu,
+#   `build-essential` supplies gcc, g++, make, and the standard development
+#   headers. Xcode Command Line Tools supplies clang/clang++ on macOS.
+#
+#   This requirement does NOT mean Hermes Desktop must be installed. The
+#   official installer installs the CLI without Desktop by default; Desktop is
+#   included only when the `--include-desktop` option is supplied.
+#
+# Node.js note:
+#   Do not install Node.js separately for the normal Hermes install. The
+#   official installer selects and manages the appropriate Node.js runtime.
+#
+# ---------------------------------------------------------------------------
+# 2. INSTALL HERMES CLI (SUPPORTED METHOD)
+# ---------------------------------------------------------------------------
+#
+# Linux / macOS / WSL2:
+#   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | \
+#     bash -s -- --non-interactive --skip-browser
+#
+# This installs the Hermes CLI without Desktop. `--skip-browser` also avoids
+# installing browser automation tools and Chromium, which are not needed for
+# the Module 6 demo. After installation, run `hermes setup` manually.
+#
+# Native Windows PowerShell:
+#   iex (irm https://hermes-agent.nousresearch.com/install.ps1)
+#
+# The official installer supplies and configures:
+#   - Hermes CLI
+#   - uv
+#   - Python 3.14
+#   - a managed Node.js runtime
+#   - ripgrep
+#   - ffmpeg
+#   - a Hermes virtual environment
+#
+# PyPI installation (`pip install hermes-agent`) is not a supported Hermes
+# distribution method. Do not add hermes-agent as a requirement below.
+#
+# After installation, reload the shell and verify/configure Hermes:
+#   source ~/.zshrc                 # or: source ~/.bashrc
+#   hermes --version
+#   hermes setup                    # choose a provider and model
+#   hermes config get model --json
+#
+# ---------------------------------------------------------------------------
+# 3. INSTALL THE MODULE 6 PYTHON DEPENDENCIES
+# ---------------------------------------------------------------------------
+#
+# From module-6-prod-harness/:
+#   python3 -m venv .venv
+#   source .venv/bin/activate       # Windows: .venv\Scripts\activate
+#   python -m pip install --upgrade pip
+#   python -m pip install -r requirements.txt
+#
+# Hermes remains in its installer-managed environment. These dependencies are
+# for the supplied Module 6 exercise, API client, and deterministic test suite.
+
+openai>=1.66.0,<2.0.0
+python-dotenv>=1.0.0,<2.0.0
+pytest>=7.4.0,<9.0.0
+requests>=2.32.0,<3.0.0
