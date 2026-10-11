@@ -46,6 +46,28 @@ def load_scenario(name: str) -> dict[str, Any]:
                 raise ValueError(f"Scenario {name!r} has an invalid action.")
     if not isinstance(scenario.get("oracle"), dict):
         raise ValueError(f"Scenario {name!r} needs an oracle.")
+    criteria = scenario.get("evaluation_criteria")
+    if not isinstance(criteria, str) or not criteria.strip():
+        raise ValueError(f"Scenario {name!r} needs evaluation_criteria.")
+    required_terms = scenario["oracle"].get("required_response_terms", [])
+    if not isinstance(required_terms, list) or not all(
+        isinstance(term, str) and term.strip() for term in required_terms
+    ):
+        raise ValueError(f"Scenario {name!r} has invalid required_response_terms.")
+    policy = scenario.get("response_policy")
+    if policy is not None:
+        if not isinstance(policy, dict):
+            raise ValueError(f"Scenario {name!r} has an invalid response_policy.")
+        max_words = policy.get("max_words")
+        terms = policy.get("required_terms")
+        if (
+            type(max_words) is not int
+            or max_words <= 0
+            or not isinstance(terms, list)
+            or not terms
+            or not all(isinstance(term, str) and term.strip() for term in terms)
+        ):
+            raise ValueError(f"Scenario {name!r} has an invalid response_policy.")
     return scenario
 
 

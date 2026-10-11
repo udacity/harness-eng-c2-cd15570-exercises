@@ -39,7 +39,7 @@ BUSINESS_TOOLS = [
     {
         "type": "function",
         "name": "rollback_deployment",
-        "description": "Request a production rollback.",
+        "description": "Roll back the production deployment to the requested version.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -53,7 +53,7 @@ BUSINESS_TOOLS = [
     {
         "type": "function",
         "name": "update_incident_status",
-        "description": "Request an incident-status change.",
+        "description": "Change the incident status to the requested value.",
         "parameters": {
             "type": "object",
             "properties": {

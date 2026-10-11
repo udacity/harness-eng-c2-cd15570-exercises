@@ -7,9 +7,12 @@ from typing import Any, Callable
 from agent import public_tool_trace, run_agent
 from config import CONFIGS
 from data import USERS, fresh_incident
-from evaluator import evaluate_response, revise_response_once
-from metrics import QUALITY_THRESHOLD, build_failures, score_deterministic
+from evaluator import evaluate_response, response_policy_failures, revise_response_once
+from metrics import build_failures, score_deterministic
 from tasks import public_agent_input
+
+
+REVISION_THRESHOLD = 4.8
 
 
 class PauseController:
@@ -48,6 +51,7 @@ def run_trial(
     scenario: dict[str, Any],
     trial_number: int,
     catalog: dict,
+    judge_model: str | None = None,
     pause: PauseController | None = None,
     emit: Callable[[str], None] = print,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict, dict]:
@@ -83,6 +87,10 @@ def run_trial(
     critic_before = None
     critic_after = None
     revision_occurred = False
+    expected_behavior = scenario["evaluation_criteria"]
+    policy_findings = response_policy_failures(
+        run["final_text"], scenario.get("response_policy")
+    )
 
     if config.evaluator:
         emit("\n--- ONLINE CRITIC ---")
@@ -92,7 +100,7 @@ def run_trial(
             candidate=run["final_text"],
             request=scenario["request"],
             trace=trace,
-            expected_behavior="Be correct, grounded, clear, and give a useful next step.",
+            expected_behavior=expected_behavior,
             blind=False,
         )
         serving_calls.append(metric)
@@ -100,7 +108,7 @@ def run_trial(
             emit("ONLINE CRITIC ERROR: " + error)
         elif critic_before is not None:
             emit(f"ONLINE CRITIC SCORE: {critic_before.overall:.2f}/5")
-            if critic_before.overall < QUALITY_THRESHOLD:
+            if critic_before.overall < REVISION_THRESHOLD or policy_findings:
                 emit("\n--- TEXT-ONLY REVISION (MAXIMUM ONE) ---")
                 revised, revision_metric = revise_response_once(
                     client,
@@ -109,6 +117,8 @@ def run_trial(
                     request=scenario["request"],
                     trace=trace,
                     score=critic_before,
+                    expected_behavior=expected_behavior,
+                    deterministic_findings=policy_findings,
                 )
                 serving_calls.append(revision_metric)
                 run["final_text"] = revised
@@ -120,7 +130,7 @@ def run_trial(
                     candidate=revised,
                     request=scenario["request"],
                     trace=trace,
-                    expected_behavior="Be correct, grounded, clear, and give a useful next step.",
+                    expected_behavior=expected_behavior,
                     blind=False,
                 )
                 serving_calls.append(after_metric)
@@ -132,11 +142,11 @@ def run_trial(
     emit("\n--- BLIND OFFLINE JUDGE ---")
     judge, benchmark_metric, benchmark_error = evaluate_response(
         client,
-        model,
+        judge_model or model,
         candidate=run["final_text"],
         request=scenario["request"],
         trace=trace,
-        expected_behavior=str(scenario["oracle"]),
+        expected_behavior=expected_behavior,
         blind=True,
     )
     if benchmark_error:
@@ -166,6 +176,7 @@ def run_trial(
         "task_name": scenario["name"],
         "trial": trial_number,
         "model": model,
+        "judge_model": judge_model or model,
         "skills_enabled": config.skills,
         "evaluator_enabled": config.evaluator,
         "hooks_enabled": config.hooks,
@@ -181,6 +192,7 @@ def run_trial(
         "evaluator_calls": sum(
             call.get("purpose") == "online_evaluator" for call in serving_calls
         ),
+        "evaluator_reviewed": critic_before is not None,
         "revision_calls": sum(
             call.get("purpose") == "revision" for call in serving_calls
         ),
@@ -234,6 +246,7 @@ def failed_trial_result(
     scenario: dict[str, Any],
     trial_number: int,
     error: Exception,
+    judge_model: str | None = None,
 ) -> dict[str, Any]:
     config = CONFIGS[config_name]
     return {
@@ -243,12 +256,14 @@ def failed_trial_result(
         "task_name": scenario["name"],
         "trial": trial_number,
         "model": model,
+        "judge_model": judge_model or model,
         "skills_enabled": config.skills,
         "evaluator_enabled": config.evaluator,
         "hooks_enabled": config.hooks,
         "permissions_enabled": config.permissions,
         "enabled_component_count": config.component_count,
         "quality_score": None,
+        "evaluator_reviewed": False,
         "total_tokens": None,
         "model_seconds": None,
         "invalid_action_executed": None,

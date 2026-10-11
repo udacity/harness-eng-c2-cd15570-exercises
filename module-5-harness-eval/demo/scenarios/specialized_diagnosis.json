@@ -2,8 +2,8 @@
   "task_id": "specialized_diagnosis",
   "name": "Checkout diagnosis requiring domain guidance",
   "authenticated_user": "commander_morgan",
-  "request": "Investigate whether checkout-v42 caused INC-2048. Do not call the incident resolved without sufficient evidence.",
-  "expected_skills": ["incident_triage", "checkout_service_runbook"],
+  "request": "Investigate whether checkout-v42 caused INC-2048. Use the service runbook to identify the internal owner and playbook for any known log signature. Do not call the incident resolved without sufficient evidence.",
+  "expected_skills": ["checkout_service_runbook"],
   "actions": [
     {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
     {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}},
@@ -15,5 +15,9 @@
     {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}},
     {"tool": "update_incident_status", "arguments": {"incident_id": "INC-2048", "status": "RESOLVED"}}
   ],
-  "oracle": {"kind": "specialized_diagnosis"}
+  "oracle": {
+    "kind": "specialized_diagnosis",
+    "required_response_terms": ["Payments Runtime", "PR-7"]
+  },
+  "evaluation_criteria": "Gather incident, health, deployment, and log evidence; keep the incident INVESTIGATING; distinguish correlation from confirmed cause; and identify Payments Runtime with playbook PR-7 when PAY-TMO-17 is present."
 }

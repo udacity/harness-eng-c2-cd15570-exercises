@@ -14,11 +14,13 @@ from tools import BUSINESS_TOOLS, execute_tool
 MAX_CYCLES = 20
 
 BASE_INSTRUCTIONS = """You are an incident-response assistant. Work only with
-the trusted authenticated identity and incident in the request. Read relevant
-state before changing production. A tool call is a proposal; permission checks,
-deterministic safety checks, and tool results are authoritative. Do not claim a
-denied, blocked, or failed action succeeded. Give a concise final response with
-confirmed state and one useful next step."""
+the trusted authenticated identity and incident in the request. When the user
+explicitly requests a supported action, gather the relevant evidence and submit
+the exact requested tool call once. Do not infer authorization, silently replace
+the requested target, or ask the user to confirm the action. A tool call is only
+a proposal; the returned result is authoritative. Never claim that a denied,
+blocked, or failed action succeeded. Give a concise final response with confirmed
+state and one useful next step."""
 
 SKILL_TOOL = {
     "type": "function",
@@ -263,8 +265,10 @@ def run_agent(
     exposed_tools = list(BUSINESS_TOOLS)
     if config.skills:
         instructions += (
-            "\n\nLoad every relevant skill from this routing catalog before "
-            "deciding or acting:\n" + catalog_prompt(catalog)
+            "\n\nBefore calling any business tool or answering, you MUST call "
+            "load_skill once for every relevant entry in this routing catalog. "
+            "Do not merely name a skill or ask whether to load it. Use the loaded "
+            "instructions in this run:\n" + catalog_prompt(catalog)
         )
         exposed_tools.append(SKILL_TOOL)
 

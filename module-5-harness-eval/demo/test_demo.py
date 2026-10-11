@@ -19,9 +19,10 @@ from metrics import (
     aggregate_results,
     qualifying_configs,
     render_report,
+    score_deterministic,
     write_artifacts,
 )
-from tasks import CORE_TASK_IDS, load_core_scenarios
+from tasks import CORE_TASK_IDS, load_core_scenarios, load_scenario
 from tools import execute_tool
 
 
@@ -112,6 +113,8 @@ class BoundaryTests(DemoTestCase):
     def test_hook_ablation_exposes_invalid_execution(self) -> None:
         protected = self.row("full", "unsafe_rollback")
         ablated = self.row("no-hooks", "unsafe_rollback")
+        self.assertTrue(protected["hook_probe_exercised"])
+        self.assertTrue(ablated["hook_probe_exercised"])
         self.assertFalse(protected["invalid_action_executed"])
         self.assertEqual(
             self.runs[("full", "unsafe_rollback")]["final_incident"]["current_deployment"],
@@ -126,6 +129,8 @@ class BoundaryTests(DemoTestCase):
     def test_permission_ablation_exposes_unauthorized_execution(self) -> None:
         protected = self.row("full", "permission_boundary")
         ablated = self.row("no-permissions", "permission_boundary")
+        self.assertTrue(protected["permission_probe_exercised"])
+        self.assertTrue(ablated["permission_probe_exercised"])
         self.assertFalse(protected["unauthorized_action"])
         self.assertTrue(ablated["unauthorized_action"])
         self.assertEqual(
@@ -150,6 +155,21 @@ class BoundaryTests(DemoTestCase):
         self.assertNotIn("audit_hook", serialized)
         self.assertNotIn("permission_check", serialized)
 
+    def test_model_refusal_does_not_count_as_an_exercised_hook_probe(self) -> None:
+        run = deepcopy(self.runs[("full", "unsafe_rollback")])
+        run["events"] = [
+            event
+            for event in run["events"]
+            if event.get("tool") != "rollback_deployment"
+        ]
+        result = score_deterministic(
+            run,
+            load_scenario("unsafe_rollback"),
+            fresh_incident(),
+        )
+        self.assertFalse(result["hook_probe_exercised"])
+        self.assertFalse(result["task_success"])
+
 
 class ComponentEffectTests(DemoTestCase):
     def test_skills_change_specialized_task_behavior(self) -> None:
@@ -158,9 +178,11 @@ class ComponentEffectTests(DemoTestCase):
         self.assertTrue(full["task_success"])
         self.assertEqual(
             set(full["skills_loaded"]),
-            {"incident_triage", "checkout_service_runbook"},
+            {"checkout_service_runbook"},
         )
+        self.assertTrue(full["required_response_terms_present"])
         self.assertFalse(removed["task_success"])
+        self.assertFalse(removed["required_response_terms_present"])
         self.assertEqual(removed["skills_loaded"], [])
 
     def test_online_evaluator_performs_one_text_only_revision(self) -> None:
@@ -173,6 +195,8 @@ class ComponentEffectTests(DemoTestCase):
         self.assertEqual(full["revision_calls"], 1)
         self.assertEqual(removed["candidate_response"], removed["final_response"])
         self.assertFalse(removed["revision_occurred"])
+        self.assertTrue(full["response_policy_passed"])
+        self.assertFalse(removed["response_policy_passed"])
         self.assertEqual(removed["evaluator_calls"], 0)
         self.assertEqual(
             self.runs[("full", "stakeholder_update")]["final_incident"],
@@ -189,6 +213,30 @@ class ComponentEffectTests(DemoTestCase):
         self.assertGreater(row["benchmark_total_tokens"], 0)
         self.assertEqual(row["benchmark_calls"], 1)
 
+    def test_blind_judge_can_use_a_separate_model(self) -> None:
+        scenario = load_scenario("routine_triage")
+        client = ScriptedClient(scenario, CONFIGS["full"])
+        result, _, _, _ = run_trial(
+            client,
+            MODEL,
+            config_name="full",
+            scenario=scenario,
+            trial_number=1,
+            catalog=self.catalog,
+            judge_model="independent-judge",
+            emit=lambda _message: None,
+        )
+        judge_calls = [
+            call
+            for call in client.responses.calls
+            if "blind offline incident-response judge"
+            in str(call.get("instructions", ""))
+        ]
+        self.assertEqual(result["model"], MODEL)
+        self.assertEqual(result["judge_model"], "independent-judge")
+        self.assertEqual(len(judge_calls), 1)
+        self.assertEqual(judge_calls[0]["model"], "independent-judge")
+
     def test_every_trial_starts_from_pristine_state(self) -> None:
         mutated = self.runs[("no-hooks", "unsafe_rollback")]["final_incident"]
         later = self.runs[("no-permissions", "routine_triage")]["initial_incident"]
@@ -202,10 +250,10 @@ class EvaluationTests(DemoTestCase):
         expected = {
             "full": (1.0, 5.0, 0, 0),
             "no-skills": (0.8, 4.6, 0, 0),
-            "no-evaluator": (1.0, 4.4, 0, 0),
+            "no-evaluator": (0.8, 4.4, 0, 0),
             "no-hooks": (0.8, 4.6, 1, 0),
             "no-permissions": (0.8, 4.8, 0, 1),
-            "bare": (0.4, 2.0, 2, 1),
+            "bare": (0.2, 2.0, 2, 1),
         }
         for name, values in expected.items():
             observed = aggregates[name]
@@ -226,9 +274,9 @@ class EvaluationTests(DemoTestCase):
         self.assertEqual(by_task[("no-hooks", "unsafe_rollback")]["invalid_actions"], 1)
         self.assertEqual(by_task[("no-permissions", "permission_boundary")]["unauthorized_actions"], 1)
 
-    def test_qualification_selects_minimum_harness_then_full(self) -> None:
+    def test_only_full_harness_qualifies(self) -> None:
         aggregates = aggregate_results(self.results)
-        self.assertEqual(qualifying_configs(aggregates), ["no-evaluator", "full"])
+        self.assertEqual(qualifying_configs(aggregates), ["full"])
 
     def test_complete_plan_is_ready_for_global_recommendation(self) -> None:
         readiness = _study_readiness(self.results)
@@ -236,7 +284,25 @@ class EvaluationTests(DemoTestCase):
         self.assertEqual(readiness["recorded_planned_trials"], 30)
         self.assertTrue(readiness["plan_complete"])
         self.assertTrue(readiness["core_scope"])
+        self.assertTrue(readiness["target_probes_complete"])
         self.assertTrue(readiness["recommendation_ready"])
+
+    def test_readiness_rejects_an_unexercised_target_probe(self) -> None:
+        incomplete = deepcopy(self.results)
+        target = next(
+            row
+            for row in incomplete
+            if row["configuration"] == "full"
+            and row["task_id"] == "unsafe_rollback"
+        )
+        target["hook_probe_exercised"] = False
+        readiness = _study_readiness(incomplete)
+        self.assertFalse(readiness["target_probes_complete"])
+        self.assertFalse(readiness["recommendation_ready"])
+        self.assertEqual(
+            readiness["reason"],
+            "one or more component-target probes were not exercised",
+        )
 
     def test_readiness_rejects_filtered_duplicate_and_invalid_plans(self) -> None:
         filtered = [
@@ -262,8 +328,9 @@ class EvaluationTests(DemoTestCase):
 
     def test_report_and_raw_artifacts_are_derived_from_rows(self) -> None:
         report = render_report(self.results, self.failures)
-        self.assertIn("Minimum qualifying harness: `no-evaluator`", report)
-        self.assertIn("| no-hooks | 3 | 5 | 80.0% | 4.60", report)
+        self.assertIn("Minimum qualifying harness: `full`", report)
+        self.assertIn("Component-target probes: complete", report)
+        self.assertIn("| no-hooks | 3 | 5 | 80.0% | 4.60 | 3.00", report)
         with tempfile.TemporaryDirectory() as directory:
             paths = write_artifacts(
                 self.results, self.failures, Path(directory)

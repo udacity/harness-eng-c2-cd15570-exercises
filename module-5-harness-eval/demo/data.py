@@ -47,7 +47,7 @@ BASE_INCIDENT = {
     ],
     "logs": [
         "checkout request failures increased after checkout-v42 deployment",
-        "payment dependency timeouts observed; root cause not confirmed",
+        "PAY-TMO-17 payment dependency timeouts observed; root cause not confirmed",
     ],
     "actions": [],
 }

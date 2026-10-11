@@ -1,17 +1,15 @@
 """Run the controlled ablation study and write CSV, JSON, and Markdown evidence."""
 
-import argparse
 import os
 import random
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from catalog import discover_skills
-from clients import ScriptedClient
 from config import CONFIGS
 from experiment import PauseController, failed_trial_result, run_trial
 from metrics import aggregate_results, build_failures, write_artifacts
-from tasks import load_core_scenarios, load_scenario, scenario_names
+from tasks import load_core_scenarios, load_scenario
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -19,39 +17,22 @@ SKILLS_DIR = BASE_DIR / "skills"
 REPORTS_DIR = BASE_DIR / "reports"
 
 
-def positive_int(value: str) -> int:
-    number = int(value)
-    if number <= 0:
-        raise argparse.ArgumentTypeError("must be a positive integer")
-    return number
+def print_trial_labels(
+    sequence: int,
+    total: int,
+    scenario: dict[str, Any],
+    config_name: str,
+) -> None:
+    """Print the same prominent scenario and loop labels as earlier modules."""
+    config_label = config_name.replace("-", " ").upper()
+    print("\n============================================================")
+    print(f"TRIAL {sequence} OF {total} START")
+    print(f"SCENARIO: {scenario['name'].upper()} ({scenario['task_id']})")
+    print(f"{config_label} LOOP START")
+    print("============================================================")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the incident harness ablation study.")
-    parser.add_argument("--config", choices=("all", *CONFIGS), default="all")
-    parser.add_argument("--task", choices=("all", *scenario_names()), default="all")
-    parser.add_argument("--runs", type=positive_int, default=1)
-    parser.add_argument(
-        "--provider", choices=("scripted", "live"), default="scripted"
-    )
-    parser.add_argument("--model")
-    parser.add_argument("--output-dir", type=Path, default=REPORTS_DIR)
-    parser.add_argument("--seed", type=int, default=15570)
-    parser.add_argument("--pause", action="store_true")
-    return parser.parse_args()
-
-
-def client_factory(
-    provider: str, model_override: str | None
-) -> tuple[Callable[[dict, str], Any], str, str]:
-    if provider == "scripted":
-        return (
-            lambda scenario, config_name: ScriptedClient(
-                scenario, CONFIGS[config_name]
-            ),
-            "scripted-fixture",
-            "local",
-        )
+def create_client(model_override: str | None) -> tuple[Any, str, str]:
     from dotenv import load_dotenv
     from openai import OpenAI
 
@@ -63,37 +44,46 @@ def client_factory(
     base_url = os.getenv(
         "OPENAI_BASE_URL", "https://openai.vocareum.com/v1"
     ).strip()
-    shared = OpenAI(base_url=base_url, api_key=key)
-    return lambda _scenario, _config_name: shared, model, base_url
+    return OpenAI(base_url=base_url, api_key=key), model, base_url
 
 
-def main() -> None:
-    args = parse_args()
-    make_client, model, endpoint = client_factory(args.provider, args.model)
+def run_study(
+    client: Any,
+    model: str,
+    endpoint: str,
+    *,
+    judge_model: str | None = None,
+    config_name: str = "all",
+    scenario_name: str = "all",
+    runs: int = 1,
+    output_dir: Path = REPORTS_DIR,
+    seed: int = 15570,
+    pause: bool = True,
+) -> None:
     catalog = discover_skills(SKILLS_DIR)
-    config_names = list(CONFIGS) if args.config == "all" else [args.config]
+    config_names = list(CONFIGS) if config_name == "all" else [config_name]
     scenarios = (
         load_core_scenarios()
-        if args.task == "all"
-        else [load_scenario(args.task)]
+        if scenario_name == "all"
+        else [load_scenario(scenario_name)]
     )
-    projected = len(config_names) * len(scenarios) * args.runs
+    projected = len(config_names) * len(scenarios) * runs
     plan = [
         (config_name, scenario, trial)
-        for trial in range(1, args.runs + 1)
+        for trial in range(1, runs + 1)
         for scenario in scenarios
         for config_name in config_names
     ]
-    random.Random(args.seed).shuffle(plan)
+    random.Random(seed).shuffle(plan)
     print("================ INCIDENT HARNESS ABLATION STUDY ================")
-    print(f"Provider:       {args.provider}")
     print(f"Model:          {model}")
+    print(f"Judge model:    {judge_model or model}")
     print(f"Endpoint:       {endpoint}")
     print(f"Configurations: {', '.join(config_names)}")
     print(f"Tasks:          {', '.join(item['task_id'] for item in scenarios)}")
-    print(f"Trials each:    {args.runs}")
+    print(f"Trials each:    {runs}")
     print(f"Total trials:   {projected}")
-    print(f"Order seed:     {args.seed}")
+    print(f"Order seed:     {seed}")
 
     results: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -101,35 +91,42 @@ def main() -> None:
     consecutive_errors = 0
     expected_tasks = [item["task_id"] for item in scenarios]
     for index, (config_name, scenario, trial) in enumerate(plan, start=1):
+        print_trial_labels(index, projected, scenario, config_name)
         try:
             result, trial_failures, _, _ = run_trial(
-                make_client(scenario, config_name),
+                client,
                 model,
                 config_name=config_name,
                 scenario=scenario,
                 trial_number=trial,
                 catalog=catalog,
-                pause=PauseController(args.pause),
+                judge_model=judge_model,
+                pause=PauseController(pause),
             )
             consecutive_errors = 0
         except Exception as error:
             consecutive_errors += 1
             result = failed_trial_result(
-                model, config_name, scenario, trial, error
+                model,
+                config_name,
+                scenario,
+                trial,
+                error,
+                judge_model=judge_model,
             )
             trial_failures = build_failures(result)
             print(f"TRIAL FAILED: {result['run_id']}: {result['run_error']}")
         result.update(
             execution_index=index,
-            study_seed=args.seed,
+            study_seed=seed,
             study_expected_configurations=list(config_names),
             study_expected_tasks=expected_tasks,
-            study_expected_runs=args.runs,
+            study_expected_runs=runs,
             study_expected_trials=projected,
         )
         results.append(result)
         failures.extend(trial_failures)
-        paths = write_artifacts(results, failures, args.output_dir.resolve())
+        paths = write_artifacts(results, failures, output_dir.resolve())
         print(f"PROGRESS: {index}/{projected}")
         if consecutive_errors >= 3:
             raise SystemExit("Stopped after three consecutive trial exceptions.")
@@ -145,7 +142,3 @@ def main() -> None:
     print(f"Results CSV:     {paths['results']}")
     print(f"Failures JSON:   {paths['failures']}")
     print(f"Markdown report: {paths['report']}")
-
-
-if __name__ == "__main__":
-    main()

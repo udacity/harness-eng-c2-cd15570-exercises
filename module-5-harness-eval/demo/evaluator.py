@@ -9,13 +9,18 @@ from typing import Any
 ONLINE_INSTRUCTIONS = """You are an online incident-response critic. Score the
 candidate using only production-available request and tool evidence. Return one
 JSON object with integer fields correctness, clarity, next_step, claim_support,
-tool_consistency from 1 through 5, plus nonempty notes. Do not revise."""
+tool_consistency from 1 through 5, plus nonempty notes. A score of 5 means every
+explicit expected-behavior requirement is satisfied. If any required fact,
+format constraint, owner, action, or timing commitment is missing, score the
+affected field 3 or lower and name the omission in notes. Do not revise."""
 
 BLIND_INSTRUCTIONS = """You are a blind offline incident-response judge. The
 harness configuration is withheld. Score the final response against the task
 expectation and confirmed trace. Return one JSON object with integer fields
 correctness, clarity, next_step, claim_support, tool_consistency from 1 through
-5, plus nonempty notes. Do not revise or execute tools."""
+5, plus nonempty notes. A score of 5 means every explicit expected-behavior
+requirement is satisfied. Missing a required fact or contradicting the trace
+must reduce the affected score to 3 or lower. Do not revise or execute tools."""
 
 REVISION_INSTRUCTIONS = """You revise an incident-response response from an
 independent critic's feedback. This is text only: you have no tools and cannot
@@ -32,6 +37,23 @@ class Score:
     tool_consistency: int
     overall: float
     notes: str
+
+
+def response_policy_failures(candidate: str, policy: Any) -> list[str]:
+    """Return deterministic response-policy failures for a candidate."""
+
+    if policy is None:
+        return []
+    failures: list[str] = []
+    max_words = policy["max_words"]
+    word_count = len(candidate.split())
+    if word_count > max_words:
+        failures.append(f"response has {word_count} words; maximum is {max_words}")
+    lowered = candidate.casefold()
+    for term in policy["required_terms"]:
+        if term.casefold() not in lowered:
+            failures.append(f"missing required term: {term}")
+    return failures
 
 
 def _metrics(response: Any, seconds: float, purpose: str) -> dict[str, Any]:
@@ -118,14 +140,19 @@ def revise_response_once(
     request: str,
     trace: list[dict[str, Any]],
     score: Score,
+    expected_behavior: str,
+    deterministic_findings: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     started = perf_counter()
     response = client.responses.create(
         model=model,
         instructions=REVISION_INSTRUCTIONS,
         input=(
-            f"REQUEST\n{request}\n\nCANDIDATE RESPONSE\n{candidate}"
+            f"REQUEST\n{request}\n\nEXPECTED BEHAVIOR\n{expected_behavior}"
+            f"\n\nCANDIDATE RESPONSE\n{candidate}"
             f"\n\nCRITIC SCORE\n{score.overall}/5: {score.notes}"
+            f"\n\nDETERMINISTIC FINDINGS\n"
+            f"{json.dumps(deterministic_findings or [], indent=2)}"
             f"\n\nIMMUTABLE TOOL TRACE\n{json.dumps(trace, indent=2)}"
         ),
     )

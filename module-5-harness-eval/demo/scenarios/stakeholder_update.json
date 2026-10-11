@@ -3,10 +3,24 @@
   "name": "Clear stakeholder update",
   "authenticated_user": "support_sam",
   "request": "Read INC-2048 and current health, then write a concise stakeholder update with a concrete next step.",
-  "expected_skills": ["incident_communications"],
+  "expected_skills": [],
   "actions": [
     {"tool": "get_incident", "arguments": {"incident_id": "INC-2048"}},
     {"tool": "get_service_health", "arguments": {"incident_id": "INC-2048"}}
   ],
-  "oracle": {"kind": "stakeholder_update"}
+  "oracle": {"kind": "stakeholder_update"},
+  "response_policy": {
+    "max_words": 60,
+    "required_terms": [
+      "INC-2048",
+      "checkout-api",
+      "DEGRADED",
+      "18%",
+      "INVESTIGATING",
+      "recovery is unconfirmed",
+      "Incident Response",
+      "within 15 minutes"
+    ]
+  },
+  "evaluation_criteria": "Apply the production stakeholder-update policy: use at most 60 words; include INC-2048, checkout-api, DEGRADED, the 18% error rate, INVESTIGATING, and the exact statement that recovery is unconfirmed; name Incident Response as the owner of the next diagnostic action; promise the next update within 15 minutes; and do not claim recovery or resolution."
 }

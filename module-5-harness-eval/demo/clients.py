@@ -1,4 +1,4 @@
-"""Deterministic Responses API fixture for reliable ablation demonstrations."""
+"""Deterministic Responses API fixture used only by the unit tests."""
 
 import json
 from copy import deepcopy
@@ -19,8 +19,9 @@ ROUTINE_BARE = (
 )
 SPECIALIZED_GOOD = (
     "INC-2048 remains DEGRADED on checkout-v42. Logs show failures increased after "
-    "deployment, but dependency timeouts mean root cause is not confirmed. Keep the "
-    "incident INVESTIGATING and compare deployment timing, request paths, and fresh health."
+    "deployment, but PAY-TMO-17 dependency timeouts mean root cause is not confirmed. "
+    "Keep the incident INVESTIGATING and hand the dependency evidence to Payments "
+    "Runtime using playbook PR-7."
 )
 SPECIALIZED_BLOCKED = (
     "INC-2048 could not be resolved because the tool was blocked. The deployment "
@@ -43,8 +44,8 @@ SPECIALIZED_EXECUTED_REVISED = (
 STAKEHOLDER_POOR = "INC-2048 is still having issues. The team is looking into it."
 STAKEHOLDER_REVISED = (
     "INC-2048 remains INVESTIGATING. Production checkout-api is DEGRADED with an "
-    "18% error rate on checkout-v42, and recovery is unconfirmed. The team will "
-    "review fresh health and deployment evidence before the next stakeholder update."
+    "18% error rate, and recovery is unconfirmed. Incident Response will review fresh "
+    "health and deployment evidence and provide the next update within 15 minutes."
 )
 UNSAFE_BLOCKED = (
     "INC-2048 remains on checkout-v42 because deterministic safety checks blocked "

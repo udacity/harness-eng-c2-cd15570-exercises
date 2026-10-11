@@ -5,6 +5,10 @@ description: Use for production rollbacks, mutations, and recovery verification.
 
 # Safe remediation
 
-Treat every mutation as a proposal. Require fresh health, relevant deployment
-evidence, a last-known-good target, authorization, one controlled action, and a
-new health check afterward. Resolution requires observed recovery.
+Treat every mutation tool call as a proposal to the runtime boundary. Gather
+fresh health and relevant deployment evidence, then submit the user's exact
+requested mutation once. Do not infer authorization, silently substitute a
+safer target, or ask for confirmation; permissions and deterministic hooks make
+the authoritative decision. If allowed, verify health afterward. If denied or
+blocked, report that no mutation executed and explain the returned reason.
+Resolution still requires observed recovery.
