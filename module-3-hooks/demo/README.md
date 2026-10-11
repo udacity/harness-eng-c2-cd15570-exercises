@@ -7,7 +7,25 @@ rollback, recovery, and resolution are initially unconfirmed.
 
 Module 1's independent final-note evaluation and Module 2's on-demand skills
 are supplied here. Module 3 adds production tools and a deterministic
-`before_tool_call` hook:
+`before_tool_call` hook.
+
+## What "mutation" means
+
+In this demo, a **mutation** is a tool call that changes the stored incident
+state. It is not a model update or a change to the program's source code. The
+agent has two mutation tools:
+
+| Mutation tool | State it changes |
+| --- | --- |
+| `rollback_deployment` | Replaces the incident's current deployment and records that a rollback occurred. |
+| `update_incident_status` | Changes the incident status, such as from `INVESTIGATING` to `RESOLVED`. |
+
+The other tools are read-only. `get_incident`, `get_service_health`,
+`get_deployment_history`, and `query_service_logs` retrieve evidence without
+changing the incident. `load_skill` retrieves instructions and also does not
+change incident state.
+
+The demo compares what happens when the model requests a state-changing tool:
 
 | Mode | Mutation path | What it demonstrates |
 | --- | --- | --- |
@@ -20,10 +38,21 @@ policy, so the comparison remains visible.
 
 ## The execution boundary
 
-The agent first loads relevant skills and gathers current incident, health,
-deployment, and log evidence. The prompt then requires it to request every
-mutation named by the operator, even when the model believes one is unsafe. A
-tool request is only a proposal; the harness owns the decision.
+The agent first loads relevant skills and uses read-only tools to gather the
+current incident, health, deployment, and log evidence. The scenario then asks
+the agent to propose specific state changes, such as rolling back a deployment
+or marking the incident resolved.
+
+Requesting a mutation tool does not mean the change has happened. It produces a
+proposal that the harness can inspect before execution. In `basic` mode, the
+harness executes the requested tool directly. In `hooks` mode, the harness runs
+deterministic Python checks first and either allows the tool to execute or
+blocks it.
+
+For teaching purposes, the prompt tells the model to request every change named
+by the operator, even if its instructions say the change looks unsafe. This
+makes the same proposal visible in both modes. The model proposes the action;
+the harness makes the final execution decision.
 
 ```text
 model proposes rollback_deployment or update_incident_status
@@ -87,48 +116,48 @@ enforcement is the new responsibility introduced in Module 4.
 The scenario files are ordinary inputs. They include the same authenticated
 user now so Module 4 can build on the contract without changing the use case.
 
-## Run the reliable classroom demo
+## Run the LLM-backed classroom demo
 
-The default scripted provider requires no API key or dependency installation:
+Install the dependencies:
 
 ```bash
 cd module-3-hooks/demo
-python3 main.py compare
-```
-
-The default `unsafe_remediation` run makes the contrast explicit. Basic mode
-finishes at `checkout-v40` and `RESOLVED`; hooks mode remains at `checkout-v42`
-and `INVESTIGATING`. Then show the allow path and the single-rule block:
-
-```bash
-python3 main.py hooks --scenario valid_rollback
-python3 main.py compare --scenario premature_resolution
-```
-
-Run one mode by itself with `python3 main.py basic` or `python3 main.py hooks`.
-Add `--pause` to wait for Return after every model cycle. Each run writes a
-timestamped transcript under `output/`.
-
-The scripted fixture provides stable tool choices and exact 60-word responses.
-Its token counts are illustrative request-size estimates, and its near-zero
-timings are not real model latency.
-
-## Run with a live model
-
-```bash
 python3 -m pip install -r requirements.txt
 ```
 
-Add the course API key to `.env`, then run:
+Add a current course API key to `.env`. Run each scenario separately with:
 
 ```bash
-python3 main.py compare --provider live
-python3 main.py hooks --scenario valid_rollback --provider live
+python3 main.py compare --scenario unsafe_remediation
+python3 main.py compare --scenario valid_rollback
+python3 main.py compare --scenario premature_resolution
 ```
 
-Use `--model` to override `OPENAI_MODEL`. The default endpoint is
-`https://openai.vocareum.com/v1`; `OPENAI_BASE_URL` can override it. `.env` and
-generated logs are ignored by Git.
+Or run all three scenarios together with:
+
+```bash
+python3 main.py compare --scenario all
+```
+
+Run one mode by itself when presenting an individual path:
+
+```bash
+python3 main.py basic --scenario unsafe_remediation
+python3 main.py hooks --scenario unsafe_remediation
+```
+
+The `unsafe_remediation` comparison makes the execution boundary visible. Basic
+mode permits the requested mutations; hooks mode evaluates them against trusted
+state and blocks the unsafe calls. `valid_rollback` demonstrates the allow path,
+and `premature_resolution` isolates the resolution rule.
+
+The demo uses `gpt-4.1-mini` through the course endpoint. Every run waits for
+Return after each model cycle and saves the terminal output under `output/`.
+After the selected scenarios finish, one comparison table places the unchecked
+basic final state beside the hook-protected final state. It shows the exact
+allow/block decision and explains the safety benefit. The unsafe scenarios show
+that hooks preserve a valid deployment and incident status; `valid_rollback`
+shows that hooks still allow a change when its checks pass.
 
 A live model can choose a different number or order of retrieval and skill
 calls. It may also omit a requested mutation despite the prompt. The summary
@@ -186,17 +215,6 @@ production rollback or status update. In both cases, the model chooses when to
 request a tool, the harness resolves trusted state, and deterministic code must
 decide before the side effect happens.
 
-## Deterministic tests
-
-```bash
-python3 -m unittest discover -s . -p 'test_*.py'
-```
-
-The tests require no API key. They cover every allow/block invariant,
-fail-closed inputs, permissive underlying tools, catalog-only skill routing,
-unsafe basic execution, blocked tool feedback, a valid allow path, exact
-60-word output, and the fresh independent evaluation boundary.
-
 ## Repository map
 
 ```text
@@ -207,13 +225,12 @@ demo/
 ├── tools.py                   # simulated retrieval and permissive mutation tools
 ├── models.py                  # HookResult structure
 ├── catalog.py                 # skill discovery and exact on-demand loading
-├── clients.py                 # deterministic Responses API fixture
 ├── evaluator.py               # supplied Module 1 evaluation boundary
 ├── scenario.py                # trusted scenario loading and context
 ├── run_log.py                 # timestamped terminal logs
 ├── scenarios/                 # unsafe, valid, and premature mutation requests
 ├── skills/                    # supplied Module 2 incident-response skills
-├── test_demo.py
+├── script.md                  # six-minute instructor presentation script
 ├── .env.example
 └── requirements.txt
 ```

@@ -28,8 +28,5 @@
       "payment dependency timeouts observed; root cause not confirmed"
     ],
     "actions": []
-  },
-  "scripted_mutations": [
-    {"tool": "update_incident_status", "arguments": {"incident_id": "INC-2048", "status": "RESOLVED"}}
-  ]
+  }
 }

@@ -28,9 +28,5 @@
       "payment dependency timeouts observed; root cause not confirmed"
     ],
     "actions": []
-  },
-  "scripted_mutations": [
-    {"tool": "rollback_deployment", "arguments": {"incident_id": "INC-2048", "target_version": "checkout-v40"}},
-    {"tool": "update_incident_status", "arguments": {"incident_id": "INC-2048", "status": "RESOLVED"}}
-  ]
+  }
 }

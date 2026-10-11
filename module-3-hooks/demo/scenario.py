@@ -36,8 +36,6 @@ def load_scenario(path: Path) -> dict[str, Any]:
         raise ValueError(f"Incident is missing: {', '.join(sorted(missing))}")
     if raw.get("scenario_id") != path.stem:
         raise ValueError("scenario_id must match the scenario filename.")
-    if not isinstance(raw.get("scripted_mutations"), list):
-        raise ValueError("scripted_mutations must be a list.")
     return deepcopy(raw)
 
 
