@@ -115,9 +115,11 @@ class AgentLoopTests(DemoTestCase):
         request = self.request("checkout_diagnosis")
         brief = build_brief(self.incident, request)
         client = ScriptedClient()
+        output = []
         result = run_basic(
-            client, MODEL, brief, self.catalog, emit=lambda _: None
+            client, MODEL, brief, self.catalog, emit=output.append
         )
+        self.assertIn("BASIC LOOP START", output)
         self.assertEqual(result["cycles"], 1)
         self.assertEqual(len(client.responses.calls), 1)
         self.assertIn("# Incident triage", client.responses.calls[0]["instructions"])
@@ -130,9 +132,11 @@ class AgentLoopTests(DemoTestCase):
         request = self.request("checkout_diagnosis")
         brief = build_brief(self.incident, request)
         client = ScriptedClient()
+        output = []
         result = run_with_skills(
-            client, MODEL, brief, self.catalog, emit=lambda _: None
+            client, MODEL, brief, self.catalog, emit=output.append
         )
+        self.assertIn("SKILLS LOOP START", output)
         calls = client.responses.calls
         self.assertEqual(result["cycles"], 2)
         self.assertEqual(result["loaded_skills"], list(request.expected_skills))
@@ -146,6 +150,7 @@ class AgentLoopTests(DemoTestCase):
             eager_client, MODEL, brief, self.catalog, emit=lambda _: None
         )
         self.assertLess(result["full_skill_chars"], eager["full_skill_chars"])
+        self.assertLess(result["input_tokens"], eager["input_tokens"])
 
     def test_no_skill_selection_still_reaches_the_writing_cycle(self) -> None:
         request = self.request("stakeholder_update")

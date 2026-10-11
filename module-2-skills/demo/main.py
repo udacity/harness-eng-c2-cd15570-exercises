@@ -4,14 +4,12 @@ import argparse
 import os
 import sys
 import traceback
-from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from agent import run_agent
 from catalog import discover_skills
-from clients import ScriptedClient
 from evaluator import evaluate_final_note
 from run_log import tee_run_output
 from scenario import build_brief, incident_context, load_incident, load_request
@@ -22,6 +20,8 @@ DATA_PATH = BASE_DIR / "data" / "incident.json"
 REQUESTS_DIR = BASE_DIR / "requests"
 SKILLS_DIR = BASE_DIR / "skills"
 OUTPUT_DIR = BASE_DIR / "output"
+MODEL = "gpt-4.1-mini"
+BASE_URL = "https://openai.vocareum.com/v1"
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,47 +41,22 @@ def parse_args() -> argparse.Namespace:
         default="checkout_diagnosis",
         help="Incident request to run (default: checkout_diagnosis).",
     )
-    parser.add_argument(
-        "--provider",
-        choices=("scripted", "live"),
-        default="scripted",
-        help="Use deterministic fixtures or a live model (default: scripted).",
-    )
-    parser.add_argument("--model", help="Override OPENAI_MODEL for live runs.")
-    parser.add_argument(
-        "--pause", action="store_true", help="Wait for Return after each model cycle."
-    )
     return parser.parse_args()
 
 
-def create_client(provider: str, model_override: str | None) -> tuple[Any, str, str]:
-    if provider == "scripted":
-        return ScriptedClient(), "scripted-fixture", "local"
-
+def create_client() -> Any:
     from dotenv import load_dotenv
     from openai import OpenAI
 
     load_dotenv(BASE_DIR / ".env")
     key = os.getenv("OPENAI_API_KEY", "").strip()
     if not key:
-        raise SystemExit(
-            f"Set OPENAI_API_KEY in {BASE_DIR / '.env'} before using --provider live."
-        )
-    model = model_override or os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip()
-    base_url = os.getenv(
-        "OPENAI_BASE_URL", "https://openai.vocareum.com/v1"
-    ).strip()
-    return OpenAI(base_url=base_url, api_key=key), model, base_url
+        raise SystemExit(f"Set OPENAI_API_KEY in {BASE_DIR / '.env'}.")
+    return OpenAI(base_url=BASE_URL, api_key=key)
 
 
-def pause_callback(enabled: bool) -> Callable[[], None]:
-    if not enabled:
-        return lambda: None
-
-    def pause() -> None:
-        input("\nCycle complete. Press Return to continue...")
-
-    return pause
+def pause_after_cycle() -> None:
+    input("\nCycle complete. Press Return to continue...")
 
 
 def percent_change(basic: int | float | None, skills: int | float | None) -> str:
@@ -142,13 +117,12 @@ def run_demo(args: argparse.Namespace) -> None:
         else [REQUESTS_DIR / f"{args.request}.json"]
     )
     modes = ("basic", "skills") if args.mode == "compare" else (args.mode,)
-    pause = pause_callback(args.pause)
-    client, model, endpoint = create_client(args.provider, args.model)
+    client = create_client()
 
     print("\n============================================================")
     print("INCIDENT-RESPONSE SKILLS DEMO")
     print("============================================================")
-    print(f"Provider: {args.provider} | Model: {model} | Endpoint: {endpoint}")
+    print(f"Model: {MODEL} | Endpoint: {BASE_URL}")
     print(f"Skills available: {', '.join(catalog)}")
     print("\nAUTHORITATIVE INCIDENT FACTS")
     print(incident_context(incident))
@@ -166,14 +140,14 @@ def run_demo(args: argparse.Namespace) -> None:
         for mode in modes:
             run = run_agent(
                 client,
-                model,
+                MODEL,
                 brief,
                 mode,
                 catalog,
-                pause=pause,
+                pause=pause_after_cycle,
             )
             evaluation = evaluate_final_note(
-                client, model, incident, request, run["output"]
+                client, MODEL, incident, request, run["output"]
             )
             selected_as_expected = (
                 None
@@ -212,15 +186,14 @@ def run_demo(args: argparse.Namespace) -> None:
     print(
         "On-demand skills expose a small routing catalog first and return full "
         "instructions only for selected names. That can reduce irrelevant "
-        "context, but the extra model cycle can increase latency and does not "
-        "guarantee a better answer."
+        "context, but the extra model cycle can increase latency."
     )
 
 
 def main() -> None:
     args = parse_args()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    log_path = OUTPUT_DIR / f"{args.mode}-{args.request}-{args.provider}-{timestamp}.log"
+    log_path = OUTPUT_DIR / f"{args.mode}-{args.request}-{timestamp}.log"
     with tee_run_output(log_path):
         print(f"Run output saved to: {log_path}")
         try:

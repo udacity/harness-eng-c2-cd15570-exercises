@@ -117,7 +117,6 @@ timings are not real model latency.
 
 ```bash
 python3 -m pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Add the course API key to `.env`, then run:

@@ -66,7 +66,6 @@ Install the dependencies and create a local environment file:
 ```bash
 cd module-1-evaluator/demo
 python3 -m pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Add your course API key to `.env`, then run:

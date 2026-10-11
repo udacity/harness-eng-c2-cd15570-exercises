@@ -222,7 +222,6 @@ This distinction matters:
 
 ```bash
 python3 -m pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Put the course API key in `.env`, then run:

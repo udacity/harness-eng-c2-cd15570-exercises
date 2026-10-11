@@ -194,7 +194,6 @@ counts estimate request size, and local timings are not real model latency.
 
 ```bash
 python3 -m pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Put the course key in `.env`, then run:

@@ -59,6 +59,9 @@ def run_basic(
 ) -> dict:
     """Send every complete skill in one eager, always-on prompt."""
 
+    emit("\n============================================================")
+    emit("BASIC LOOP START")
+    emit("============================================================")
     skill_texts = [load_skill(name, catalog)[0] for name in catalog]
     all_skill_text = "\n\n".join(skill_texts)
     full_skill_chars = sum(len(text) for text in skill_texts)
@@ -175,6 +178,9 @@ def run_with_skills(
 ) -> dict:
     """Select and load skills in cycle one, then write in cycle two."""
 
+    emit("\n============================================================")
+    emit("SKILLS LOOP START")
+    emit("============================================================")
     catalog_text, selection_instructions = build_selection_instructions(catalog)
     emit("\n--- SKILLS CYCLE 1 OF 2: SELECT AND LOAD ---")
     emit(
