@@ -162,54 +162,64 @@ policy harder to audit.
 Every mode starts from a deep copy of the pristine incident. A basic run cannot
 change the starting state of the following permissions run.
 
-## Run the reliable classroom demo
+## Run the LLM-backed classroom demo
 
-The scripted provider needs no API key or dependency installation:
+Install the dependencies:
 
 ```bash
 cd module-4-permissions/demo
-python3 main.py compare
-```
-
-Then demonstrate an allowed action, resource-level access, impersonation, and
-separate authorization/safety decisions:
-
-```bash
-python3 main.py permissions --scenario commander_rollback
-python3 main.py compare --scenario unassigned_read
-python3 main.py permissions --scenario impersonation_attempt
-python3 main.py permissions --scenario responder_rollback_resolve
-python3 main.py permissions --scenario commander_premature_resolution
-python3 main.py permissions --scenario admin_reassign
-```
-
-Use `basic` or `permissions` instead of `compare` for one mode. Add `--pause`
-to wait for Return after every model cycle. Each CLI run writes a timestamped
-transcript under `output/`.
-
-The scripted fixture gives stable tool choices and exact 60-word notes. Token
-counts estimate request size, and local timings are not real model latency.
-
-## Run with a live model
-
-```bash
 python3 -m pip install -r requirements.txt
 ```
 
-Put the course key in `.env`, then run:
+Add a current course API key to `.env`. Run any scenario in `compare` mode to
+execute the basic loop first and the permissions loop second, each from the
+same pristine incident state:
 
 ```bash
-python3 main.py compare --provider live
-python3 main.py permissions --scenario commander_rollback --provider live
+python3 main.py compare --scenario unauthorized_rollback
+python3 main.py compare --scenario commander_rollback
+python3 main.py compare --scenario impersonation_attempt
+python3 main.py compare --scenario responder_rollback_resolve
+python3 main.py compare --scenario commander_premature_resolution
+python3 main.py compare --scenario assigned_read
+python3 main.py compare --scenario unassigned_read
+python3 main.py compare --scenario admin_reassign
 ```
 
-`OPENAI_MODEL` defaults to `gpt-4.1-mini`; `--model` overrides it. The default
-endpoint is `https://openai.vocareum.com/v1`, configurable with
-`OPENAI_BASE_URL`.
+Run all eight scenarios together with:
 
-A live model may choose different skills, omit a requested action, or stop
-early. The summary reports actual proposals, decisions, hooks, executions, and
-state changes. It never labels an unrequested action allowed or denied.
+```bash
+python3 main.py compare --scenario all
+```
+
+Use `basic` or `permissions` instead of `compare` to run only one side:
+
+```bash
+python3 main.py basic --scenario unauthorized_rollback
+python3 main.py permissions --scenario unauthorized_rollback
+```
+
+Every run waits for Return after each model cycle, making the transition from
+`BASIC LOOP START` to `PERMISSIONS LOOP START` easy to see. After all selected
+scenarios finish, the `PERMISSIONS VALUE COMPARISON` table places the actual
+authorization-unchecked basic result beside the permission-enforced result and
+explains what authorization added. Each scenario begins with a prominent
+two-line label showing its sequence, display name, and exact scenario ID:
+
+```text
+SCENARIO 1 OF 8 START
+UNAUTHORIZED ROLLBACK (unauthorized_rollback)
+```
+
+The eight labels are Unauthorized Rollback, Authorized Commander Rollback,
+Impersonation Attempt, Responder Rollback and Resolution, Commander Premature
+Resolution, Assigned Incident Read, Unassigned Incident Read, and Administrator
+Reassignment. Each CLI run writes a timestamped transcript under `output/`.
+
+The demo uses `gpt-4.1-mini` through the course endpoint. Model behavior may
+vary: it can choose different skills, omit a requested action, or stop early.
+The summary reports actual proposals, decisions, hooks, executions, and state
+changes. It never labels an unrequested action allowed or denied.
 
 ## Supplied evaluation and skills
 
@@ -238,7 +248,8 @@ Evaluation cost is printed separately and excluded from serving metrics.
 7. Run `commander_premature_resolution` and follow `ALLOW` → hook block.
 8. Run `unassigned_read` and show resource-level assignment enforcement.
 9. Run `impersonation_attempt` and compare the words with the trusted subject.
-10. End with the action-by-action summary and unchanged or changed final state.
+10. End with the `PERMISSIONS VALUE COMPARISON` table and show what was denied,
+    what was authorized, and how the final state differed.
 
 ## From this demo to the exercise
 
@@ -261,17 +272,16 @@ support assignment check uses `assigned_user_id`. Both compare the trusted
 resource field with the authenticated user's ID. Neither trusts claims in the
 request or asks the model to decide authorization.
 
-## Deterministic tests
+## Unit tests
 
 ```bash
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-The 17 tests require no API key. They cover the role matrix, tool coverage,
+The 11 tests require no API key. They cover the role matrix, tool coverage,
 assignment matching, fail-closed inputs, impersonation resistance, permissive
 underlying tools, denial short-circuiting, authorization followed by hook
-blocking, independent multi-action decisions, paired-mode equivalence, all
-scripted outputs, scenario integrity, and the fresh evaluator boundary.
+blocking, basic-mode behavior, skill-catalog boundaries, and scenario integrity.
 
 ## Repository map
 
@@ -285,12 +295,12 @@ demo/
 ├── data.py                    # trusted users and pristine incident state
 ├── models.py                  # PermissionResult and HookResult
 ├── catalog.py                 # exact on-demand skill loading
-├── clients.py                 # deterministic Responses API fixture
 ├── evaluator.py               # retained Module 1 evaluation boundary
 ├── scenario.py                # trusted scenario validation
 ├── run_log.py                 # timestamped terminal logs
 ├── scenarios/                 # eight identity/action/resource cases
 ├── skills/                    # four incident-response skills
+├── script.md                  # six-minute instructor presentation script
 ├── test_demo.py
 ├── .env.example
 └── requirements.txt

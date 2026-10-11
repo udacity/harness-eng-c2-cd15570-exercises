@@ -22,16 +22,6 @@ def load_scenario(path: Path) -> dict[str, Any]:
         not isinstance(name, str) for name in raw.get("expected_skills", [])
     ):
         raise ValueError("expected_skills must be a list of names.")
-    actions = raw.get("scripted_actions")
-    if not isinstance(actions, list) or not actions:
-        raise ValueError("scripted_actions must be a nonempty list.")
-    for action in actions:
-        if (
-            not isinstance(action, dict)
-            or not isinstance(action.get("tool"), str)
-            or not isinstance(action.get("arguments"), dict)
-        ):
-            raise ValueError("Every scripted action needs a tool and arguments.")
     return deepcopy(raw)
 
 

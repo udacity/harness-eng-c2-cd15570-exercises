@@ -5,14 +5,12 @@ import json
 import os
 import sys
 import traceback
-from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from agent import run_agent
 from catalog import discover_skills
-from clients import ScriptedClient
 from data import USERS, fresh_incident
 from evaluator import evaluate_final_note
 from run_log import tee_run_output
@@ -23,10 +21,28 @@ BASE_DIR = Path(__file__).resolve().parent
 SCENARIOS_DIR = BASE_DIR / "scenarios"
 SKILLS_DIR = BASE_DIR / "skills"
 OUTPUT_DIR = BASE_DIR / "output"
+MODEL = "gpt-4.1-mini"
+BASE_URL = "https://openai.vocareum.com/v1"
+SCENARIO_LABELS = {
+    "unauthorized_rollback": "UNAUTHORIZED ROLLBACK",
+    "commander_rollback": "AUTHORIZED COMMANDER ROLLBACK",
+    "impersonation_attempt": "IMPERSONATION ATTEMPT",
+    "responder_rollback_resolve": "RESPONDER ROLLBACK AND RESOLUTION",
+    "commander_premature_resolution": "COMMANDER PREMATURE RESOLUTION",
+    "assigned_read": "ASSIGNED INCIDENT READ",
+    "unassigned_read": "UNASSIGNED INCIDENT READ",
+    "admin_reassign": "ADMINISTRATOR REASSIGNMENT",
+}
+
+
+def scenario_names() -> list[str]:
+    available = {path.stem for path in SCENARIOS_DIR.glob("*.json")}
+    ordered = [name for name in SCENARIO_LABELS if name in available]
+    return ordered + sorted(available - set(ordered))
 
 
 def parse_args() -> argparse.Namespace:
-    names = sorted(path.stem for path in SCENARIOS_DIR.glob("*.json"))
+    names = scenario_names()
     parser = argparse.ArgumentParser(
         description="Compare incident tools with and without authorization."
     )
@@ -38,53 +54,26 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scenario",
-        choices=names,
+        choices=(*names, "all"),
         default="unauthorized_rollback",
-        help="Request to run (default: unauthorized_rollback).",
-    )
-    parser.add_argument(
-        "--provider",
-        choices=("scripted", "live"),
-        default="scripted",
-        help="Use deterministic fixtures or a live model (default: scripted).",
-    )
-    parser.add_argument("--model", help="Override OPENAI_MODEL for live runs.")
-    parser.add_argument(
-        "--pause", action="store_true", help="Wait for Return after each model cycle."
+        help="Incident scenario to run, or all (default: unauthorized_rollback).",
     )
     return parser.parse_args()
 
 
-def create_client(
-    provider: str, model_override: str | None, scenario: dict
-) -> tuple[Any, str, str]:
-    if provider == "scripted":
-        return ScriptedClient(scenario), "scripted-fixture", "local"
-
+def create_client() -> Any:
     from dotenv import load_dotenv
     from openai import OpenAI
 
     load_dotenv(BASE_DIR / ".env")
     key = os.getenv("OPENAI_API_KEY", "").strip()
     if not key:
-        raise SystemExit(
-            f"Set OPENAI_API_KEY in {BASE_DIR / '.env'} before using --provider live."
-        )
-    model = model_override or os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip()
-    base_url = os.getenv(
-        "OPENAI_BASE_URL", "https://openai.vocareum.com/v1"
-    ).strip()
-    return OpenAI(base_url=base_url, api_key=key), model, base_url
+        raise SystemExit(f"Set OPENAI_API_KEY in {BASE_DIR / '.env'}.")
+    return OpenAI(base_url=BASE_URL, api_key=key)
 
 
-def pause_callback(enabled: bool) -> Callable[[], None]:
-    if not enabled:
-        return lambda: None
-
-    def pause() -> None:
-        input("\nCycle complete. Press Return to continue...")
-
-    return pause
+def pause_after_cycle() -> None:
+    input("\nCycle complete. Press Return to continue...")
 
 
 def print_evaluation(evaluation: dict[str, Any]) -> None:
@@ -170,77 +159,209 @@ def print_summary(run: dict[str, Any]) -> None:
         print(f"   Result status:       {event['result_status']}")
 
 
+TOOL_LABELS = {
+    "get_incident": "incident read",
+    "get_service_health": "health read",
+    "get_deployment_history": "deployment read",
+    "query_service_logs": "log read",
+    "rollback_deployment": "rollback",
+    "update_incident_status": "status update",
+    "reassign_incident": "reassignment",
+}
+READ_TOOLS = {
+    "get_incident",
+    "get_service_health",
+    "get_deployment_history",
+    "query_service_logs",
+}
+
+
+def _tool_names(events: list[dict[str, Any]]) -> str:
+    counts: dict[str, int] = {}
+    for event in events:
+        name = event["tool"]
+        counts[name] = counts.get(name, 0) + 1
+    read_count = sum(count for name, count in counts.items() if name in READ_TOOLS)
+    labels: list[str] = []
+    if read_count == 1:
+        read_name = next(name for name in counts if name in READ_TOOLS)
+        labels.append(TOOL_LABELS[read_name])
+    elif read_count > 1:
+        labels.append(f"evidence reads x{read_count}")
+    for name, count in counts.items():
+        if name in READ_TOOLS:
+            continue
+        label = TOOL_LABELS.get(name, name)
+        labels.append(f"{label} x{count}" if count > 1 else label)
+    return ", ".join(labels) or "none"
+
+
+def _basic_result(run: dict[str, Any] | None) -> str:
+    if run is None:
+        return "not run"
+    events = business_events(run)
+    executed = [event for event in events if event["tool_executed"]]
+    blocked = [event for event in events if event["result_status"] == "blocked"]
+    parts = [f"executed: {_tool_names(executed)}"]
+    if blocked:
+        parts.append(f"hook blocked: {_tool_names(blocked)}")
+    return "; ".join(parts)
+
+
+def _permissions_result(run: dict[str, Any] | None) -> str:
+    if run is None:
+        return "not run"
+    events = business_events(run)
+    executed = [event for event in events if event["tool_executed"]]
+    denied = [event for event in events if event["permission_check"] == "DENIED"]
+    blocked = [event for event in events if event["result_status"] == "blocked"]
+    parts = [f"executed after ALLOW: {_tool_names(executed)}"]
+    if denied:
+        parts.append(f"denied: {_tool_names(denied)}")
+    if blocked:
+        parts.append(f"hook blocked: {_tool_names(blocked)}")
+    return "; ".join(parts)
+
+
+def _authorization_effect(
+    basic: dict[str, Any] | None, permissions: dict[str, Any] | None
+) -> str:
+    if permissions is None:
+        return "Run compare mode to observe authorization."
+    events = business_events(permissions)
+    denied = [event for event in events if event["permission_check"] == "DENIED"]
+    allowed = [event for event in events if event["permission_check"] == "ALLOWED"]
+    blocked = [event for event in allowed if event["result_status"] == "blocked"]
+    effects: list[str] = []
+    if denied:
+        effects.append(f"stopped unauthorized {_tool_names(denied)}")
+    elif allowed:
+        effects.append(f"verified authority for {len(allowed)} call(s)")
+    if blocked:
+        effects.append(f"hook independently blocked {_tool_names(blocked)}")
+    if basic is not None:
+        before = basic["final_incident"]
+        after = permissions["final_incident"]
+        changed = []
+        for label, key in (
+            ("deployment", "current_deployment"),
+            ("status", "incident_status"),
+            ("assignee", "assigned_user_id"),
+        ):
+            if before[key] != after[key]:
+                changed.append(f"{label} {before[key]} -> {after[key]}")
+        if changed:
+            effects.append("; ".join(changed))
+    return "; ".join(effects) or "no business tool call was proposed"
+
+
 def print_comparison(rows: list[dict[str, Any]]) -> None:
-    if len(rows) < 2:
+    if not rows:
         return
-    print("\n================ ENFORCEMENT COMPARISON ================")
-    print("Mode        | Allowed | Denied | Hooked | Executed | Deploy       | Status")
-    print("------------+---------+--------+--------+----------+--------------+--------------")
+
+    grouped: dict[str, dict[str, dict[str, Any]]] = {}
     for row in rows:
         run = row["run"]
-        events = business_events(run)
-        allowed = sum(event["permission_check"] == "ALLOWED" for event in events)
-        denied = sum(event["permission_check"] == "DENIED" for event in events)
-        hooked = sum(event["hook_executed"] for event in events)
-        executed = sum(event["tool_executed"] for event in events)
-        print(
-            f"{run['mode']:<12}| {str(allowed) if run['mode'] == 'permissions' else 'n/a':<8}| "
-            f"{str(denied) if run['mode'] == 'permissions' else 'n/a':<7}| "
-            f"{hooked:<7}| {executed:<9}| "
-            f"{run['final_incident']['current_deployment']:<13}| "
-            f"{run['final_incident']['incident_status']}"
+        grouped.setdefault(run["scenario_id"], {})[run["mode"]] = run
+
+    table_rows: list[tuple[str, str, str, str]] = []
+    for scenario_id, runs in grouped.items():
+        basic = runs.get("basic")
+        permissions = runs.get("permissions")
+        table_rows.append(
+            (
+                scenario_id,
+                _basic_result(basic),
+                _permissions_result(permissions),
+                _authorization_effect(basic, permissions),
+            )
         )
+
+    headers = (
+        "Scenario",
+        "Without permissions (basic)",
+        "With permissions",
+        "What permissions added",
+    )
+    widths = [
+        max(len(headers[index]), *(len(row[index]) for row in table_rows))
+        for index in range(len(headers))
+    ]
+    print("\n================ PERMISSIONS VALUE COMPARISON ================")
+    print(" | ".join(f"{value:<{widths[index]}}" for index, value in enumerate(headers)))
+    print("-+-".join("-" * width for width in widths))
+    for row in table_rows:
+        print(" | ".join(f"{value:<{widths[index]}}" for index, value in enumerate(row)))
+    print(
+        "Basic skips authorization, while existing safety hooks still check mutations. "
+        "Permissions checks every proposed action and resource before hooks or tools run."
+    )
     print("Evaluator calls are benchmark overhead, excluded from serving metrics.")
 
 
 def run_demo(args: argparse.Namespace) -> None:
-    scenario = load_scenario(SCENARIOS_DIR / f"{args.scenario}.json")
-    authenticated_user = dict(USERS[scenario["authenticated_user"]])
     catalog = discover_skills(SKILLS_DIR)
+    scenario_paths = (
+        [SCENARIOS_DIR / f"{name}.json" for name in scenario_names()]
+        if args.scenario == "all"
+        else [SCENARIOS_DIR / f"{args.scenario}.json"]
+    )
     modes = ("basic", "permissions") if args.mode == "compare" else (args.mode,)
-    pause = pause_callback(args.pause)
-    client, model, endpoint = create_client(args.provider, args.model, scenario)
+    client = create_client()
 
     print("\n============================================================")
     print("INCIDENT-RESPONSE PERMISSIONS DEMO")
     print("============================================================")
-    print(f"Provider: {args.provider} | Model: {model} | Endpoint: {endpoint}")
-    print(f"Scenario: {scenario['scenario_id']}")
+    print(f"Model: {MODEL} | Endpoint: {BASE_URL}")
     print(f"Skills available: {', '.join(catalog)}")
-    print("\nAUTHENTICATED USER (trusted application state)")
-    print(json.dumps(authenticated_user, indent=2))
-    print("\nUSER REQUEST")
-    print(scenario["request"])
-    print("\nPRISTINE INCIDENT STATE FOR EACH MODE")
-    print(incident_context(fresh_incident()))
     print("\nBoth modes retain Module 3 safety hooks; only authorization changes.")
 
     rows: list[dict[str, Any]] = []
-    for mode in modes:
-        incident = fresh_incident()
+    scenario_count = len(scenario_paths)
+    for scenario_number, path in enumerate(scenario_paths, start=1):
+        scenario = load_scenario(path)
+        authenticated_user = dict(USERS[scenario["authenticated_user"]])
         print("\n============================================================")
-        print(f"MODE: {mode.upper()}")
+        print(f"SCENARIO {scenario_number} OF {scenario_count} START")
+        label = SCENARIO_LABELS.get(
+            scenario["scenario_id"], scenario["scenario_id"].upper()
+        )
+        print(
+            f"{label} ({scenario['scenario_id']})"
+        )
         print("============================================================")
-        run = run_agent(
-            client,
-            model,
-            mode,
-            authenticated_user,
-            scenario,
-            incident,
-            catalog,
-            pause=pause,
-        )
-        evaluation = evaluate_final_note(
-            client,
-            model,
-            run["final_incident"],
-            run["events"],
-            run["output"],
-        )
-        print_evaluation(evaluation)
-        print_summary(run)
-        rows.append({"run": run, "evaluation": evaluation})
+        print("\nAUTHENTICATED USER (trusted application state)")
+        print(json.dumps(authenticated_user, indent=2))
+        print("\nUSER REQUEST")
+        print(scenario["request"])
+        print("\nPRISTINE INCIDENT STATE FOR EACH MODE")
+        print(incident_context(fresh_incident()))
+
+        for mode in modes:
+            incident = fresh_incident()
+            print("\n============================================================")
+            print(f"{mode.upper()} LOOP START")
+            print("============================================================")
+            run = run_agent(
+                client,
+                MODEL,
+                mode,
+                authenticated_user,
+                scenario,
+                incident,
+                catalog,
+                pause=pause_after_cycle,
+            )
+            evaluation = evaluate_final_note(
+                client,
+                MODEL,
+                run["final_incident"],
+                run["events"],
+                run["output"],
+            )
+            print_evaluation(evaluation)
+            print_summary(run)
+            rows.append({"run": run, "evaluation": evaluation})
 
     print_comparison(rows)
     print("\nTeaching takeaway:")
@@ -254,7 +375,7 @@ def run_demo(args: argparse.Namespace) -> None:
 def main() -> None:
     args = parse_args()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    log_path = OUTPUT_DIR / f"{args.mode}-{args.scenario}-{args.provider}-{timestamp}.log"
+    log_path = OUTPUT_DIR / f"{args.mode}-{args.scenario}-{timestamp}.log"
     with tee_run_output(log_path):
         print(f"Run output saved to: {log_path}")
         try:

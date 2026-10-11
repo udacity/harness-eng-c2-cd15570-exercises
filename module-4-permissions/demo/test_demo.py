@@ -1,15 +1,13 @@
-"""Deterministic tests for the cumulative Module 4 permissions demo."""
+"""Unit tests for the cumulative Module 4 permissions demo."""
 
 import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from agent import ALL_TOOLS, build_instructions, handle_tool_call, run_agent
+from agent import ALL_TOOLS, build_instructions, handle_tool_call
 from catalog import discover_skills
-from clients import FINAL_RESPONSES, ScriptedClient
 from data import USERS, fresh_incident
-from evaluator import evaluate_final_note
 from permissions import (
     ROLE_PERMISSIONS,
     SUPPORT_ASSIGNED_PERMISSIONS,
@@ -21,7 +19,6 @@ from tools import TOOL_HANDLERS, execute_tool
 
 
 BASE_DIR = Path(__file__).parent
-MODEL = "scripted-fixture"
 
 
 def tool_call(
@@ -41,21 +38,6 @@ class DemoTestCase(unittest.TestCase):
 
     def scenario(self, name: str = "unauthorized_rollback") -> dict:
         return load_scenario(BASE_DIR / "scenarios" / f"{name}.json")
-
-    def execute_demo(self, mode: str, name: str = "unauthorized_rollback") -> tuple:
-        scenario = self.scenario(name)
-        client = ScriptedClient(scenario)
-        result = run_agent(
-            client,
-            MODEL,
-            mode,
-            USERS[scenario["authenticated_user"]],
-            scenario,
-            fresh_incident(),
-            self.catalog,
-            emit=lambda _: None,
-        )
-        return client, result
 
 
 class PermissionMatrixTests(DemoTestCase):
@@ -232,88 +214,16 @@ class EnforcementBoundaryTests(DemoTestCase):
         self.assertNotIn("Treat a production mutation as a proposed", instructions)
 
 
-class AgentLoopTests(DemoTestCase):
-    def test_default_scenario_is_unsafe_without_permissions_and_denied_with_them(self) -> None:
-        _, basic = self.execute_demo("basic")
-        _, protected = self.execute_demo("permissions")
-        self.assertEqual(basic["final_incident"]["current_deployment"], "checkout-v41")
-        self.assertEqual(
-            protected["final_incident"]["current_deployment"], "checkout-v42"
-        )
-        self.assertTrue(
-            any(
-                event["permission_check"] == "DENIED"
-                for event in protected["events"]
-            )
-        )
-        self.assertEqual(
-            basic["loaded_skills"], ["incident_triage", "safe_remediation"]
-        )
-
-    def test_assignment_and_impersonation_scenarios(self) -> None:
-        _, assigned = self.execute_demo("permissions", "assigned_read")
-        _, unassigned = self.execute_demo("permissions", "unassigned_read")
-        _, impersonation = self.execute_demo("permissions", "impersonation_attempt")
-        self.assertEqual(assigned["events"][-1]["permission_check"], "ALLOWED")
-        self.assertEqual(unassigned["events"][-1]["permission_check"], "DENIED")
-        self.assertEqual(impersonation["events"][-1]["permission_check"], "DENIED")
-        self.assertEqual(
-            impersonation["authenticated_user"]["role"], "support_engineer"
-        )
-
-    def test_each_action_is_authorized_independently(self) -> None:
-        _, result = self.execute_demo("permissions", "responder_rollback_resolve")
-        rollback = next(
-            event for event in result["events"] if event["tool"] == "rollback_deployment"
-        )
-        resolve = next(
-            event
-            for event in result["events"]
-            if event["tool"] == "update_incident_status"
-        )
-        self.assertEqual(rollback["permission_check"], "ALLOWED")
-        self.assertTrue(rollback["tool_executed"])
-        self.assertEqual(resolve["permission_check"], "DENIED")
-        self.assertFalse(resolve["hook_executed"])
-        self.assertEqual(result["final_incident"]["incident_status"], "INVESTIGATING")
-
-    def test_modes_expose_identical_prompt_tools_identity_and_request(self) -> None:
-        clients = {}
-        for mode in ("basic", "permissions"):
-            client, _ = self.execute_demo(mode)
-            clients[mode] = client
-        basic_call = clients["basic"].responses.calls[0]
-        protected_call = clients["permissions"].responses.calls[0]
-        self.assertEqual(basic_call["tools"], protected_call["tools"])
-        self.assertEqual(basic_call["instructions"], protected_call["instructions"])
-        self.assertEqual(basic_call["input"], protected_call["input"])
-
-    def test_every_scripted_note_has_sixty_words(self) -> None:
-        for candidate in FINAL_RESPONSES:
-            with self.subTest(candidate=candidate[:35]):
-                self.assertEqual(len(candidate.split()), 60)
-
-    def test_evaluator_is_fresh_and_excluded_from_serving_metrics(self) -> None:
-        client, result = self.execute_demo("permissions")
-        serving_total = result["total_tokens"]
-        evaluation = evaluate_final_note(
-            client,
-            MODEL,
-            result["final_incident"],
-            result["events"],
-            result["output"],
-        )
-        self.assertTrue(evaluation["passed"])
-        self.assertNotIn("previous_response_id", client.responses.calls[-1])
-        self.assertEqual(result["total_tokens"], serving_total)
-
-    def test_every_scenario_references_trusted_data_and_known_tools(self) -> None:
+class ScenarioTests(DemoTestCase):
+    def test_every_scenario_references_trusted_users_and_skills(self) -> None:
         for path in (BASE_DIR / "scenarios").glob("*.json"):
             with self.subTest(scenario=path.stem):
                 scenario = load_scenario(path)
                 self.assertIn(scenario["authenticated_user"], USERS)
-                for action in scenario["scripted_actions"]:
-                    self.assertIn(action["tool"], TOOL_HANDLERS)
+                self.assertTrue(scenario["expected_skills"])
+                self.assertTrue(
+                    all(name in self.catalog for name in scenario["expected_skills"])
+                )
 
 
 if __name__ == "__main__":
