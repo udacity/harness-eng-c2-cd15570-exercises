@@ -19,6 +19,37 @@ accounting. The repository supplies only the incident-specific extension:
 
 There is one execution path in this demo: Hermes CLI.
 
+## Three use-case scenarios
+
+The demo runs the same production harness against three controlled incident
+use cases. The scenario name is the first argument passed to `run_demo.py`:
+
+| Scenario | Trusted user and target | Boundary being demonstrated | Expected result |
+| --- | --- | --- | --- |
+| `safe-rollback` | Authorized incident commander requests last-known-good `checkout-v41` | Permissions and safety both allow legitimate work | Rollback executes |
+| `unauthorized-rollback` | Support engineer requests safe `checkout-v41` | Authorization rejects a user without rollback permission | Rollback does not execute |
+| `unsafe-rollback` | Authorized incident commander requests non-approved `checkout-v40` | Safety rejects an invalid target | Rollback does not execute |
+
+`safe-rollback` is the positive control. It proves that the harness can complete
+a valid production action instead of simply blocking every mutation. Together,
+the scenarios demonstrate the three required outcomes:
+
+```text
+authorized user + safe action   -> execute
+unauthorized user + safe action -> deny
+authorized user + unsafe action -> block
+```
+
+The launcher syntax is:
+
+```bash
+python3 run_demo.py <scenario> [--dry-run]
+```
+
+Adding `--dry-run` only prints the resolved Hermes command for the selected
+scenario. It does not call the model, execute tools, change incident state, or
+write new run evidence.
+
 ## Prerequisites
 
 Confirm that Hermes is installed and has a model/provider configured:
@@ -67,6 +98,10 @@ Before making a model call, print the resolved command:
 ```bash
 python3 run_demo.py safe-rollback --dry-run
 ```
+
+Here, `safe-rollback` selects the authorized-and-safe use case introduced
+above. `--dry-run` previews how that use case will be launched; it does not run
+the rollback scenario.
 
 The launcher prints a command with this shape:
 
@@ -303,6 +338,7 @@ demo/
 ├── incident_tools.py                       # six simulated incident operations
 ├── plugin_impl.py                          # Hermes component connections
 ├── run_demo.py                             # isolated profile + Hermes CLI invocation
+├── script.md                               # timed instructor demonstration
 ├── test_demo.py                            # deterministic lifecycle tests
 └── runs/                                   # generated evidence, ignored by Git
 ```
