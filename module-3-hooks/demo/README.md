@@ -172,9 +172,14 @@ longer tool loop.
 
 After the agent finishes, `evaluator.py` preserves Module 1's boundary:
 
-- Python verifies exactly 60 whitespace-separated words and `INC-2048`.
+- Python verifies exactly 60 whitespace-separated words and matches the
+  complete `INC-2048` identifier token, rejecting longer or suffixed IDs.
 - A fresh model conversation judges factual grounding and the usefulness of
   the next step against final state and execution evidence.
+
+Each named review criterion must appear exactly once with the exact decision
+`PASS` or `FAIL`. Missing, malformed, duplicate, or conflicting decisions fail
+closed.
 
 Evaluator tokens and time are printed as benchmark overhead and excluded from
 serving metrics. This keeps evaluation separate from the execution policy: a

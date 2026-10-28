@@ -230,9 +230,14 @@ selects an exact name.
 After serving completes, the Module 1 boundary independently checks the final
 note:
 
-- Python verifies exactly 60 whitespace-separated words and `INC-2048`.
+- Python verifies exactly 60 whitespace-separated words and matches the
+  complete `INC-2048` identifier token, rejecting longer or suffixed IDs.
 - A fresh model conversation judges factual grounding and the next step against
   final state plus enforcement events.
+
+Each named review criterion must appear exactly once with the exact decision
+`PASS` or `FAIL`. Missing, malformed, duplicate, or conflicting decisions fail
+closed.
 
 Evaluation cost is printed separately and excluded from serving metrics.
 
@@ -278,10 +283,12 @@ request or asks the model to decide authorization.
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-The 11 tests require no API key. They cover the role matrix, tool coverage,
+The 19 tests require no API key. They cover the role matrix, tool coverage,
 assignment matching, fail-closed inputs, impersonation resistance, permissive
 underlying tools, denial short-circuiting, authorization followed by hook
-blocking, basic-mode behavior, skill-catalog boundaries, and scenario integrity.
+blocking, basic-mode behavior, skill-catalog boundaries, scenario integrity,
+malformed identity values, complete incident-ID matching, and strict
+review-result parsing.
 
 ## Repository map
 
@@ -302,6 +309,7 @@ demo/
 ├── skills/                    # four incident-response skills
 ├── script.md                  # six-minute instructor presentation script
 ├── test_demo.py
+├── test_evaluator.py
 ├── .env.example
 └── requirements.txt
 ```

@@ -81,7 +81,12 @@ def check_permission(
     role = user.get("role") if isinstance(user, dict) else None
     user_id = user.get("user_id") if isinstance(user, dict) else None
     ordinary_permission = TOOL_PERMISSIONS[tool_name]
-    if role not in ROLE_PERMISSIONS or not isinstance(user_id, str):
+    if (
+        not isinstance(role, str)
+        or role not in ROLE_PERMISSIONS
+        or not isinstance(user_id, str)
+        or not user_id.strip()
+    ):
         return PermissionResult(
             False, ordinary_permission, "Authenticated identity is invalid."
         )

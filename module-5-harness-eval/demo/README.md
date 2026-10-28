@@ -307,12 +307,13 @@ analysis on its own artifacts.
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-The 21 tests need no API key. They cover the exact configuration matrix,
+The 23 tests need no API key. They cover the exact configuration matrix,
 single-variable ablations, task scope, pristine trial state, permissive tools,
-permission and hook enforcement, shadow observation, skill effects, text-only
-revision, strict response policy, target-probe coverage, blind-trace isolation,
-separate judge selection, cost separation, aggregation, qualification, study
-readiness, and artifact generation.
+permission and hook enforcement, malformed identities, shadow observation,
+skill effects, text-only revision, strict response policy, typed trial-key and
+target-probe coverage, blind-trace isolation, separate judge selection, cost
+separation, aggregation, qualification, study readiness, and artifact
+generation.
 
 ## Repository map
 

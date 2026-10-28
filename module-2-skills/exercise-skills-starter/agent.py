@@ -13,8 +13,9 @@ brief. Do not invent performance numbers, customers, endorsements, or
 guarantees. Return the campaign copy with clear section headings."""
 
 # TODO: Define a Responses API function tool named load_skill. It should take
-# one required string argument, skill_name, and reject additional properties.
-# The model will see this tool only during the skill-selection cycle.
+# one required string argument, skill_name, reject additional properties, and
+# enable strict mode. The model will see this tool only during the
+# skill-selection cycle.
 SKILL_TOOL: dict[str, Any] = {}
 
 
@@ -89,12 +90,13 @@ def build_selection_instructions(catalog: dict) -> tuple[str, str]:
 def resolve_skill_call(item: Any, catalog: dict) -> tuple[dict, dict]:
     """Return (skill call record, function_call_output) for one tool call.
 
-    TODO: Accept only load_skill, parse item.arguments as JSON, require a
-    string skill_name, and call the supplied load_skill function. For a valid
-    name, return the full skill text as the tool output and record its path
-    and character count. For malformed arguments or an unknown name, return
-    an ERROR tool output with the same item.call_id; do not read any other
-    file. The call record should contain skill, loaded, path, and chars.
+    TODO: Accept only load_skill and parse item.arguments as JSON. Require an
+    object whose only key is skill_name, require its value to be a string, and
+    then call the supplied load_skill function. For a valid name, return the
+    full skill text as the tool output and record its path and character count.
+    For malformed arguments, extra keys, or an unknown name, return an ERROR
+    tool output with the same item.call_id; do not read any file. The call
+    record should contain skill, loaded, path, and chars.
     """
     raise NotImplementedError("Resolve a requested skill safely.")
 

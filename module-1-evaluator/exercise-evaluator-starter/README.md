@@ -35,8 +35,8 @@ The starter includes the five cases, both reference documents, model setup, gene
 
 Work through these files in order:
 
-1. **[harness/loops/self_evaluation_loop.py](harness/loops/self_evaluation_loop.py):** Write a reviewer prompt covering all four criteria and a clear `VERDICT`. Parse that verdict, failing closed when it is absent. Call `client.responses.create` with `previous_response_id=response.id` so the review continues the generator's conversation. Implement the two-cycle loop: print the draft and review, stop on self `PASS`, and otherwise revise from the review response ID. Pause after every cycle.
-2. **[harness/loops/external_evaluation_loop.py](harness/loops/external_evaluation_loop.py):** Check `len(candidate.split()) == 100` and the exact case ID in Python. Write a fresh evaluator prompt for policy compliance and useful next step, then call the model **without** `previous_response_id`. Parse its two named results. Compare its results and Python's results with the self-review of the **same candidate**; report a false positive when self-review says overall `PASS` and at least one external check says `FAIL`. Revise using external feedback, stopping when all four external checks pass or after three cycles. Pause after every cycle.
+1. **[harness/loops/self_evaluation_loop.py](harness/loops/self_evaluation_loop.py):** Write a reviewer prompt covering all four criteria and a clear `VERDICT`. Require exactly one valid decision for every criterion and the verdict; reject missing, malformed, duplicate, or conflicting lines. Stop on self `PASS` only when all four criteria and the overall verdict are `PASS`. Call `client.responses.create` with `previous_response_id=response.id` so the review continues the generator's conversation. Implement the two-cycle loop: print the draft and review, stop on a validated self `PASS`, and otherwise revise from the review response ID. Pause after every cycle.
+2. **[harness/loops/external_evaluation_loop.py](harness/loops/external_evaluation_loop.py):** Check `len(candidate.split()) == 100` and the complete case-ID token in Python—`CASE-18420` must not satisfy `CASE-1842`. Write a fresh evaluator prompt for policy compliance and useful next step, then call the model **without** `previous_response_id`. Require exactly one valid result for each named criterion. Compare its results and Python's results with the self-review of the **same candidate**; report a false positive when self-review says overall `PASS` and at least one external check says `FAIL`. Revise using external feedback, stopping when all four external checks pass or after three cycles. Pause after every cycle.
 
 Keep the candidate unchanged while all reviewers inspect it. A separate `self` run and `external` run generate different replies, so their verdicts cannot demonstrate a false positive against one draft. The comparison inside an `external` cycle can.
 
@@ -44,7 +44,7 @@ The supplied cases and reference documents are exercise inputs. Keep them intact
 
 ## Set up
 
-Use Python 3.12 or a compatible Python 3 installation. From `module-1-evaluator/exercise-evaluator/`:
+Use Python 3.12 or a compatible Python 3 installation. From `module-1-evaluator/exercise-evaluator-starter/`:
 
 ```bash
 python3 -m pip install -r requirements.txt
@@ -105,7 +105,7 @@ Here, **Independent** means the combined external verdict: Python supplies `WORD
 ## Repository map
 
 ```text
-exercise-evaluator/
+exercise-evaluator-starter/
 ├── data/
 │   ├── cases/                  # five supplied customer cases
 │   └── reference/              # refund policy and response requirements

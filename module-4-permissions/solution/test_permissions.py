@@ -83,6 +83,30 @@ class PermissionMatrixTests(unittest.TestCase):
         result = check_permission(USERS["admin_taylor"], "approve_application", {}, self.applications)
         self.assertFalse(result.allowed)
 
+    def test_malformed_identity_values_fail_closed(self) -> None:
+        arguments = {"project": "Small Addition", "address": "1 Example Street"}
+        invalid_users = [
+            {"user_id": "", "role": "contractor"},
+            {"user_id": "   ", "role": "contractor"},
+            {"user_id": None, "role": "contractor"},
+            {"role": "contractor"},
+            {"user_id": "USR-101", "role": ["contractor"]},
+            {"user_id": "USR-101", "role": {"name": "contractor"}},
+            {"user_id": "USR-101"},
+        ]
+        for user in invalid_users:
+            with self.subTest(user=user):
+                decision = check_permission(
+                    user,
+                    "create_application",
+                    arguments,
+                    self.applications,
+                )
+                self.assertFalse(decision.allowed)
+                self.assertEqual(
+                    decision.reason, "Authenticated identity is invalid."
+                )
+
     def test_scenarios_reference_trusted_users_and_known_resources(self) -> None:
         scenarios = Path(__file__).resolve().parent / "scenarios"
         for path in scenarios.glob("*.json"):

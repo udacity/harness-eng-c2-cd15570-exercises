@@ -22,6 +22,7 @@ SKILL_TOOL = {
         "required": ["skill_name"],
         "additionalProperties": False,
     },
+    "strict": True,
 }
 
 
@@ -103,6 +104,8 @@ def resolve_skill_call(item: Any, catalog: dict) -> tuple[dict, dict]:
         if item.name != "load_skill":
             raise ValueError(f"Unsupported tool: {item.name}")
         arguments = json.loads(item.arguments)
+        if not isinstance(arguments, dict) or set(arguments) != {"skill_name"}:
+            raise ValueError("arguments must contain only skill_name")
         name = arguments["skill_name"]
         if not isinstance(name, str):
             raise ValueError("skill_name must be a string")

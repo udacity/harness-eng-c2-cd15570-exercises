@@ -73,7 +73,12 @@ def check_permission(
         return PermissionResult(False, TOOL_PERMISSIONS[tool_name], "Authenticated identity is invalid.")
     role = user.get("role")
     user_id = user.get("user_id")
-    if role not in ROLE_PERMISSIONS or not isinstance(user_id, str) or not user_id:
+    if (
+        not isinstance(role, str)
+        or role not in ROLE_PERMISSIONS
+        or not isinstance(user_id, str)
+        or not user_id.strip()
+    ):
         return PermissionResult(False, TOOL_PERMISSIONS[tool_name], "Authenticated identity is invalid.")
     if not isinstance(arguments, dict):
         return PermissionResult(False, TOOL_PERMISSIONS[tool_name], "Tool arguments must be an object.")

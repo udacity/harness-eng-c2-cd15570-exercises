@@ -31,9 +31,10 @@ def evaluate_deterministic_criteria(
     """Check word count and case ID without asking a model.
 
     TODO: Count words with len(candidate.split()), as the requirements say.
-    Check that the exact case ID appears in the candidate. Return an overall
-    Boolean plus human-readable lines beginning WORD_COUNT: and CASE_ID:;
-    include the observed word count so the generator can fix it.
+    Check that the complete case-ID token appears in the candidate; a longer ID
+    such as CASE-18420 must not satisfy CASE-1842. Return an overall Boolean
+    plus human-readable lines beginning WORD_COUNT: and CASE_ID:; include the
+    observed word count so the generator can fix it.
     """
     raise NotImplementedError("Add deterministic response checks.")
 
@@ -41,7 +42,9 @@ def evaluate_deterministic_criteria(
 def deterministic_criterion_passed(results: list[str], criterion: str) -> bool:
     """Read one PASS or FAIL from deterministic result lines.
 
-    TODO: Return True only for an explicit '<criterion>: PASS' result.
+    TODO: Return True only when exactly one result for the criterion exists and
+    its explicit decision is PASS. Reject missing, malformed, or duplicate
+    result lines.
     """
     raise NotImplementedError("Read a deterministic criterion result.")
 
@@ -49,8 +52,9 @@ def deterministic_criterion_passed(results: list[str], criterion: str) -> bool:
 def inferential_criterion_passed(evaluation: str, criterion: str) -> bool:
     """Read one named PASS or FAIL from the independent model's output.
 
-    TODO: Match the criterion label, not an arbitrary PASS in feedback.
-    Missing or malformed results should fail closed.
+    TODO: Match the criterion label, not an arbitrary PASS in feedback. Require
+    exactly one PASS or FAIL line for that label. Missing, malformed, duplicate,
+    or conflicting results should fail closed.
     """
     raise NotImplementedError("Read an inferential criterion result.")
 

@@ -157,9 +157,9 @@ implementation task has the same shape:
 
 | Demo code | Exercise task |
 | --- | --- |
-| `passed()` | Parse an explicit self-evaluator `VERDICT`, failing closed when absent. |
+| `passed()` | Require one valid decision for every self-review criterion and one consistent `VERDICT`; fail closed on missing, malformed, or duplicate lines. |
 | `evaluate_own_response()` | Continue the generator conversation with `previous_response_id=response.id`. |
-| `evaluate_deterministic_criteria()` | Count words with `split()` and find the exact case identifier in Python. |
+| `evaluate_deterministic_criteria()` | Count words with `split()` and match the complete case-identifier token in Python. |
 | `evaluate_inferential_criteria()` | Start a fresh evaluator conversation for the judgment-based criteria. |
 | `run_self_evaluation_loop()` | Review, revise from the review response, and stop on self `PASS` or the limit. |
 | `run_external_evaluation_loop()` | Evaluate the same candidate on both paths, compare criteria, revise from external feedback, and stop on independent `PASS` or the limit. |

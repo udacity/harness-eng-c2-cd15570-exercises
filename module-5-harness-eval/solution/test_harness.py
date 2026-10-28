@@ -18,6 +18,7 @@ from evaluator import EvaluationParseError, parse_evaluation_json
 from experiment import PauseController, failed_trial_result, run_trial
 from hooks import run_before_tool_hooks
 from metrics import (
+    _study_readiness,
     aggregate_results,
     build_failures,
     qualifying_configs,
@@ -142,6 +143,26 @@ class ConfigAndStateTests(unittest.TestCase):
 class DeterministicBoundaryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.store = fresh_store()
+
+    def test_malformed_identity_values_fail_closed(self) -> None:
+        arguments = {"order_id": "ORD-1001"}
+        invalid_users = [
+            {"user_id": "", "role": "support_agent"},
+            {"user_id": "   ", "role": "support_agent"},
+            {"user_id": None, "role": "support_agent"},
+            {"role": "support_agent"},
+            {"user_id": "USR-201", "role": ["support_agent"]},
+            {"user_id": "USR-201", "role": {"name": "support_agent"}},
+            {"user_id": "USR-201", "role": "invented"},
+            {"user_id": "USR-201"},
+        ]
+        for user in invalid_users:
+            with self.subTest(user=user):
+                decision = check_permission(user, "lookup_order", arguments)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(
+                    decision.reason, "Authenticated identity is invalid."
+                )
 
     def test_refund_permission_thresholds(self) -> None:
         support = USERS["support_jordan"]
@@ -409,6 +430,31 @@ class LoopAndTrialTests(unittest.TestCase):
 
 
 class MetricAndReportTests(unittest.TestCase):
+    def test_readiness_rejects_malformed_trial_values(self) -> None:
+        row = {
+            "configuration": "bare",
+            "task_id": "simple_return",
+            "trial": 1,
+            "study_expected_configurations": ["bare"],
+            "study_expected_tasks": ["simple_return"],
+            "study_expected_runs": 1,
+            "study_expected_trials": 1,
+        }
+        self.assertTrue(_study_readiness([row])["plan_complete"])
+
+        for trial in (True, False, [1], "1", 1.0, None, 0, -1, 2):
+            with self.subTest(trial=trial):
+                malformed = {**row, "trial": trial}
+                readiness = _study_readiness([malformed])
+                self.assertFalse(readiness["plan_complete"])
+                self.assertFalse(readiness["recommendation_ready"])
+
+        invalid_declaration = {**row, "study_expected_trials": True}
+        self.assertEqual(
+            _study_readiness([invalid_declaration])["reason"],
+            "study-plan metadata is unavailable",
+        )
+
     def test_noop_is_not_task_success_for_any_scenario(self) -> None:
         for path in (BASE_DIR / "scenarios").glob("*.json"):
             scenario = load_scenario(path.stem)

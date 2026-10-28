@@ -229,7 +229,11 @@ The trusted employees are:
 | `supervisor` | The same operational actions and refunds up to $500.00. |
 | `administrator` | General refunds plus the listed administrative authority. |
 
-The role comes from application state, not from customer or model text. Amount-based refund authorization uses exact cents in [`permissions.py`](permissions.py).
+The role comes from application state, not from customer or model text. The
+permission boundary fails closed unless the user ID is a string containing at
+least one non-space character and the role is a string present in the role
+map. Amount-based refund authorization uses exact cents in
+[`permissions.py`](permissions.py).
 
 [`hooks.py`](hooks.py) applies four deterministic checks to relevant tools:
 
@@ -435,7 +439,13 @@ Blind quality-score coverage = 100%
 
 Among qualifying configurations, the report chooses the one with the fewest enabled components; mean serving tokens and then serving latency break ties only when their coverage is complete. Configurations without complete cost coverage rank after configurations with complete measurements when component counts tie. If none qualifies, the report says so. It does not hard-code that skills, hooks, permissions, or the evaluator must win.
 
-The recommendation gate also requires the declared study plan to be fully recorded and to contain every core task and all six configurations. This prevents an easy single-task run or an early checkpoint from being mistaken for evidence that the whole harness can be removed.
+The recommendation gate also requires the declared study plan to be fully
+recorded and to contain every core task and all six configurations. Every
+recorded trial number must have the exact integer type and fall within the
+declared repetition range; malformed trial keys make the study incomplete.
+This prevents an easy single-task run, malformed result data, or an early
+checkpoint from being mistaken for evidence that the whole harness can be
+removed.
 
 A small number of trials is evidence for the exercise, not production assurance. Increase repetitions and add held-out tasks before making a consequential deployment decision.
 

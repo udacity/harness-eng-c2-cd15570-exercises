@@ -133,8 +133,11 @@ Complete the tasks in this order.
    current application state. The function must not execute tools or mutate
    applications.
 4. **Fail closed.** Deny unknown tools, invalid identities, malformed
-   arguments, missing resource IDs, and applications that do not exist.
-   Include an explanatory reason and the required permission when it is known.
+   arguments, missing resource IDs, and applications that do not exist. A
+   valid identity requires a nonblank string `user_id` and a string `role`
+   present in `ROLE_PERMISSIONS`; validate the role type before dictionary
+   lookup. Include an explanatory reason and the required permission when it
+   is known.
 5. **Apply ownership.** For contractor read, edit, and submit actions, require
    both the ownership match and the corresponding `_own` permission. Populate
    `ownership` with `match` or `no_match`. Other actions use the ordinary tool
@@ -342,7 +345,7 @@ so the exercise stays focused on authorization.
 - [ ] `permissions` checks every proposal immediately before execution.
 - [ ] Every role and tool has the required permission mapping.
 - [ ] Contractor own read, edit, and submit actions require matching ownership.
-- [ ] Unknown tools, invalid identities, bad arguments, missing IDs, and missing applications fail closed.
+- [ ] Unknown tools, blank or non-string user IDs, invalid role values, bad arguments, missing IDs, and missing applications fail closed.
 - [ ] Contractor approval, rejection, issuance, and revocation are denied.
 - [ ] Reviewer issuance is denied; supervisor approval is allowed; supervisor issuance is denied.
 - [ ] Administrator issuance and revocation are allowed.

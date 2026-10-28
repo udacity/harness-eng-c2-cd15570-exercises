@@ -123,7 +123,9 @@ authorize, hooks validate, and tools perform actions.
 
 Money is represented as integer cents. The supplied permission boundary uses
 the trusted employee identity from application state, never identity claims in
-customer or model text:
+customer or model text. It fails closed unless `user_id` is a string containing
+at least one non-space character and `role` is a string present in
+`ROLE_PERMISSIONS`:
 
 | Role | Relevant authority |
 | --- | --- |
@@ -242,6 +244,10 @@ not a valid repetition count.
 Build the exact planned set of `(configuration, task_id, trial)` keys. The plan
 is complete only when:
 
+- every result key has string `configuration` and `task_id` fields plus a
+  `trial` whose exact type is `int` and whose value is between `1` and the
+  declared repetition count; Boolean, collection, string, float, missing, and
+  out-of-range trial values make the plan incomplete rather than raising;
 - every row contains the same study metadata;
 - the declared total equals the computed number of planned trials;
 - the actual key set equals the planned key set; and

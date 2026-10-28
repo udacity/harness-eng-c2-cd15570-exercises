@@ -24,24 +24,48 @@ FEEDBACK: one concise explanation of every failure
 """.strip()
 
 
-def passed(evaluation: str) -> bool:
-    """Trust only an explicit `VERDICT: PASS`; missing output fails closed."""
+SELF_EVALUATION_CRITERIA = (
+    "WORD_COUNT",
+    "INCIDENT_ID",
+    "FACTUAL_GROUNDING",
+    "USEFUL_NEXT_STEP",
+)
+VALID_DECISIONS = {"PASS", "FAIL"}
 
+
+def unique_decision(evaluation: str, expected_label: str) -> str | None:
+    """Return one exact PASS/FAIL decision; reject missing or duplicate labels."""
+
+    decisions: list[str] = []
+    normalized_label = expected_label.strip().upper()
     for line in evaluation.splitlines():
         label, separator, decision = line.partition(":")
-        if separator and label.strip().upper() == "VERDICT":
-            return decision.strip().upper() == "PASS"
-    return False
+        if not separator or label.strip().upper() != normalized_label:
+            continue
+        normalized_decision = decision.strip().upper()
+        if normalized_decision not in VALID_DECISIONS:
+            return None
+        decisions.append(normalized_decision)
+    return decisions[0] if len(decisions) == 1 else None
+
+
+def passed(evaluation: str) -> bool:
+    """Accept only one consistent PASS verdict with four passing criteria."""
+
+    criterion_decisions = [
+        unique_decision(evaluation, criterion)
+        for criterion in SELF_EVALUATION_CRITERIA
+    ]
+    verdict = unique_decision(evaluation, "VERDICT")
+    return verdict == "PASS" and all(
+        decision == "PASS" for decision in criterion_decisions
+    )
 
 
 def criterion_passed(evaluation: str, criterion: str) -> bool:
-    """Read one exact named decision without matching PASS in feedback."""
+    """Accept exactly one PASS for the named criterion."""
 
-    for line in evaluation.splitlines():
-        label, separator, decision = line.partition(":")
-        if separator and label.strip().upper() == criterion:
-            return decision.strip().upper() == "PASS"
-    return False
+    return unique_decision(evaluation, criterion) == "PASS"
 
 
 def evaluate_own_response(

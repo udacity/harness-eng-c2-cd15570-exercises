@@ -116,6 +116,28 @@ class PermissionMatrixTests(DemoTestCase):
         ]
         self.assertTrue(all(not decision.allowed for decision in cases))
 
+    def test_malformed_identity_values_fail_closed(self) -> None:
+        incident = fresh_incident()
+        arguments = {"incident_id": "INC-2048"}
+        invalid_users = [
+            {"user_id": "", "role": "responder"},
+            {"user_id": "   ", "role": "responder"},
+            {"user_id": None, "role": "responder"},
+            {"role": "responder"},
+            {"user_id": "OPS-201", "role": ["responder"]},
+            {"user_id": "OPS-201", "role": {"name": "responder"}},
+            {"user_id": "OPS-201"},
+        ]
+        for user in invalid_users:
+            with self.subTest(user=user):
+                decision = check_permission(
+                    user, "get_incident", arguments, incident
+                )
+                self.assertFalse(decision.allowed)
+                self.assertEqual(
+                    decision.reason, "Authenticated identity is invalid."
+                )
+
     def test_request_text_cannot_change_authenticated_identity(self) -> None:
         scenario = self.scenario("impersonation_attempt")
         self.assertIn("administrator", scenario["request"])

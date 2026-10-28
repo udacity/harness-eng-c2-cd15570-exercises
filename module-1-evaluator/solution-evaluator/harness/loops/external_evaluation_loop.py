@@ -3,7 +3,11 @@ import re
 from openai import OpenAI
 
 from harness.generator import REVISION_INSTRUCTIONS, generate_initial_response
-from harness.loops.self_evaluation_loop import evaluate_own_response, passed
+from harness.loops.self_evaluation_loop import (
+    evaluate_own_response,
+    passed,
+    unique_decision,
+)
 from harness.pauses import pause_after_cycle
 
 
@@ -33,6 +37,16 @@ def extract_case_id(customer_case: str) -> str:
     return case_id_match.group()
 
 
+def contains_exact_case_id(candidate: str, expected_case_id: str) -> bool:
+    """Match one complete CASE-#### token rather than a longer identifier."""
+
+    pattern = (
+        rf"(?<![A-Za-z0-9_-]){re.escape(expected_case_id)}"
+        r"(?![A-Za-z0-9_-])"
+    )
+    return re.search(pattern, candidate) is not None
+
+
 def evaluate_deterministic_criteria(
     candidate: str,
     customer_case: str,
@@ -40,7 +54,7 @@ def evaluate_deterministic_criteria(
     word_count = len(candidate.split())
     expected_case_id = extract_case_id(customer_case)
     length_passed = word_count == REQUIRED_WORD_COUNT
-    case_id_passed = expected_case_id in candidate
+    case_id_passed = contains_exact_case_id(candidate, expected_case_id)
 
     results = [
         (
@@ -59,18 +73,24 @@ def evaluate_deterministic_criteria(
 # Read one deterministic result from the human-readable result lines
 # =============================================================================
 def deterministic_criterion_passed(results: list[str], criterion: str) -> bool:
-    return any(result.startswith(f"{criterion}: PASS") for result in results)
+    decisions: list[str] = []
+    normalized_criterion = criterion.strip().upper()
+    for result in results:
+        label, separator, detail = result.partition(":")
+        if not separator or label.strip().upper() != normalized_criterion:
+            continue
+        fields = detail.strip().split(maxsplit=1)
+        if not fields or fields[0].upper() not in {"PASS", "FAIL"}:
+            return False
+        decisions.append(fields[0].upper())
+    return decisions == ["PASS"]
 
 
 # =============================================================================
 # Check the two criteria that require independent model judgment
 # =============================================================================
 def inferential_criterion_passed(evaluation: str, criterion: str) -> bool:
-    for line in evaluation.splitlines():
-        label, separator, decision = line.partition(":")
-        if separator and label.strip().upper() == criterion:
-            return decision.strip().upper() == "PASS"
-    return False
+    return unique_decision(evaluation, criterion) == "PASS"
 
 
 def evaluate_inferential_criteria(

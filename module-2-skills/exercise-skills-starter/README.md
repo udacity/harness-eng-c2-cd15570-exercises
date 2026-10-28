@@ -20,8 +20,8 @@ The starter includes the six campaign briefs and six complete skill files, model
 Complete these parts:
 
 1. **[catalog.py](catalog.py):** Implement `catalog_prompt` so the selection cycle receives each skill's name and frontmatter description, with no full skill body. `discover_skills` and `load_skill` are supplied. The latter validates names against the catalog before reading a file.
-2. **[agent.py](agent.py):** Define the `load_skill` function-tool schema with one required string argument, `skill_name`. The schema should reject additional properties.
-3. **[agent.py](agent.py):** Implement `build_selection_instructions` so cycle 1 contains the base rules and short catalog. Implement `resolve_skill_call` so valid requests become full-text `function_call_output` items and malformed or unknown requests become error results without reading another file.
+2. **[agent.py](agent.py):** Define the `load_skill` function-tool schema with one required string argument, `skill_name`. Enable strict mode and reject additional properties.
+3. **[agent.py](agent.py):** Implement `build_selection_instructions` so cycle 1 contains the base rules and short catalog. Implement `resolve_skill_call` so it independently requires an argument object containing only `skill_name`. Valid requests become full-text `function_call_output` items; malformed, extra-key, or unknown requests become error results without reading another file.
 4. **[agent.py](agent.py):** Implement `write_with_skills` to continue from the selection response ID without offering tools. Then implement `run_with_skills` to connect both cycles, print and pause after each, and return the result fields used by the comparison table. The no-skill case must still produce a final campaign.
 5. **[skills/magazine_ad/SKILL.md](skills/magazine_ad/SKILL.md):** After your first paired comparison, make one targeted improvement to the magazine guidance based on an issue you observe in the ad. Keep its routing description short and put the detailed change in the body. Rerun the magazine brief in `skills` mode and describe what changed in the copy. The model may not follow the revised guidance perfectly; use the output as evidence rather than assuming success.
 
@@ -71,7 +71,7 @@ Write a short run note explaining which skills were relevant, whether every requ
 
 - [ ] `basic` still runs with all six full skill files in its prompt.
 - [ ] The `skills` selection prompt contains names and descriptions, with full skill bodies returned only for requested names.
-- [ ] Valid `load_skill` calls produce tool results; unknown names produce an error result without reading another path.
+- [ ] Valid `load_skill` calls produce tool results; malformed objects, extra arguments, and unknown names produce an error result without reading another path.
 - [ ] The second cycle writes a final campaign, including when no skill was selected, and pauses after both cycles.
 - [ ] The comparison table shows loaded skills, full skill characters, tokens, time, and percentage changes for paired runs.
 - [ ] A targeted edit to the magazine skill can be loaded without changing the catalog reader, agent routing code, or CLI.

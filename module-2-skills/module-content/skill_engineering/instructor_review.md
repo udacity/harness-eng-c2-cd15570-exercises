@@ -71,10 +71,10 @@ and production review. It is not a finished slide deck or recorded lesson.
 
 - [ ] `catalog.py` behavior is described exactly.
 - [ ] The local parser is not described as a full YAML implementation.
-- [ ] The demo tool schema includes one required string and rejects extra
-  properties, but does not set the provider `strict: true` flag.
-- [ ] The production pseudocode recommends `strict: true` while retaining
-  application-side validation.
+- [ ] The demo tool schema includes one required string, rejects extra
+  properties, and sets the provider `strict: true` flag.
+- [ ] The demo and production pseudocode retain application-side validation
+  even when provider strict mode is enabled.
 - [ ] The response may contain zero, one, or multiple function calls.
 - [ ] Tool outputs preserve the original `call_id`.
 - [ ] `previous_response_id` is used only where the repository uses it.

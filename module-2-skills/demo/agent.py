@@ -23,6 +23,7 @@ SKILL_TOOL: dict[str, Any] = {
         "required": ["skill_name"],
         "additionalProperties": False,
     },
+    "strict": True,
 }
 
 

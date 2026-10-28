@@ -11,15 +11,18 @@ from harness.pauses import pause_after_cycle
 # TODO: Write instructions that ask the model to check all four response
 # requirements. Require one PASS or FAIL line for WORD_COUNT, CASE_ID,
 # POLICY_COMPLIANCE, and USEFUL_NEXT_STEP, followed by VERDICT and FEEDBACK.
-# A PASS verdict should mean every criterion passed.
+# A PASS verdict should mean every criterion passed. Reject missing, malformed,
+# duplicate, or conflicting decision lines rather than trusting the first one.
 SELF_EVALUATOR_INSTRUCTIONS = """TODO: Define the self-evaluator's role and output format."""
 
 
 def passed(evaluation: str) -> bool:
     """Return True only when the evaluation explicitly reports VERDICT: PASS.
 
-    TODO: Parse the verdict line. Missing or malformed verdicts should fail
-    closed so the loop cannot accept an unreviewed response.
+    TODO: Require exactly one PASS or FAIL line for every named criterion and
+    exactly one VERDICT line. Return True only when all four criteria and the
+    verdict are PASS. Missing, malformed, duplicate, or conflicting lines must
+    fail closed so the loop cannot accept an unreviewed response.
     """
     raise NotImplementedError("Parse the self-evaluator verdict.")
 

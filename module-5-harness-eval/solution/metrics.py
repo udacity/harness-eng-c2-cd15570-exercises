@@ -488,6 +488,15 @@ def _delta(full: Any, ablated: Any, suffix: str = "") -> str:
 def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Verify that every row in the declared study plan has been recorded."""
 
+    if not results or not isinstance(results[0], dict):
+        return {
+            "planned_trials": None,
+            "recorded_planned_trials": None,
+            "plan_complete": False,
+            "core_scope": False,
+            "recommendation_ready": False,
+            "reason": "study-plan metadata is unavailable",
+        }
     first = results[0]
     expected_configs = first.get("study_expected_configurations")
     expected_tasks = first.get("study_expected_tasks")
@@ -504,6 +513,8 @@ def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
         and len(set(expected_tasks)) == len(expected_tasks)
         and type(expected_runs) is int
         and expected_runs > 0
+        and type(declared_trials) is int
+        and declared_trials > 0
     )
     if not metadata_valid:
         return {
@@ -522,21 +533,39 @@ def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
         for trial in range(1, expected_runs + 1)
     }
     metadata_consistent = all(
-        row.get("study_expected_configurations") == expected_configs
+        isinstance(row, dict)
+        and row.get("study_expected_configurations") == expected_configs
         and row.get("study_expected_tasks") == expected_tasks
         and row.get("study_expected_runs") == expected_runs
         and row.get("study_expected_trials") == declared_trials
         for row in results
     )
-    actual_keys = {
-        (row.get("configuration"), row.get("task_id"), row.get("trial"))
-        for row in results
-    }
+    actual_keys: set[tuple[str, str, int]] = set()
+    result_keys_valid = True
+    for row in results:
+        if not isinstance(row, dict):
+            result_keys_valid = False
+            continue
+        configuration = row.get("configuration")
+        task_id = row.get("task_id")
+        trial = row.get("trial")
+        if not (
+            isinstance(configuration, str)
+            and configuration in expected_configs
+            and isinstance(task_id, str)
+            and task_id in expected_tasks
+            and type(trial) is int
+            and 1 <= trial <= expected_runs
+        ):
+            result_keys_valid = False
+            continue
+        actual_keys.add((configuration, task_id, trial))
     planned_trials = len(planned_keys)
     declaration_valid = declared_trials == planned_trials
     recorded_planned_trials = len(actual_keys & planned_keys)
     plan_complete = (
         metadata_consistent
+        and result_keys_valid
         and declaration_valid
         and actual_keys == planned_keys
         and len(results) == planned_trials

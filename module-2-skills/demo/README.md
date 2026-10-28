@@ -178,12 +178,14 @@ After either serving path produces a note, `evaluator.py` applies the Module 1
 evaluation pattern:
 
 - Python checks the exact 60-word count.
-- Python checks for the exact `INC-2048` identifier.
+- Python matches the complete `INC-2048` identifier token, rejecting longer or
+  suffixed identifiers.
 - A fresh LLM conversation judges factual grounding.
 - The fresh evaluator judges whether the next step is useful and safe.
 
-The final note passes only when all four criteria pass. Missing or malformed
-named evaluator decisions fail closed.
+The final note passes only when all four criteria pass. Each named evaluator
+criterion must appear exactly once with the exact decision `PASS` or `FAIL`.
+Missing, malformed, duplicate, or conflicting decisions fail closed.
 
 Evaluator calls are experiment overhead rather than part of the `basic` or
 `skills` serving design. Their tokens and time are printed separately and are

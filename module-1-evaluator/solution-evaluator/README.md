@@ -63,7 +63,9 @@ The response requirements document defines four checks:
 | Inferential | Follows the refund and replacement policy | A fresh evaluator conversation judges the response. |
 | Inferential | Gives a useful, policy-compliant next step | The fresh evaluator judges the response. |
 
-The exact count creates an objective check that the model may misjudge when reviewing its own draft. In `external`, the Python count and the self-review apply to the **same response**. If self-review gives an overall `PASS` but Python counts anything other than 100 words, the comparison reports a self-evaluation false positive. The policy and next-step checks remain model judgments, so inspect the response when those evaluators disagree.
+The exact count creates an objective check that the model may misjudge when reviewing its own draft. The case-ID check matches a complete `CASE-####` token, so a longer identifier such as `CASE-18420` cannot satisfy `CASE-1842`. In `external`, the Python checks and the self-review apply to the **same response**. If self-review gives an overall `PASS` but Python finds an incorrect count or case ID, the comparison reports a self-evaluation false positive. The policy and next-step checks remain model judgments, so inspect the response when those evaluators disagree.
+
+Evaluator output also fails closed. Each named criterion must appear exactly once with the exact decision `PASS` or `FAIL`. A self-review passes only when all four criteria and one overall `VERDICT` are `PASS`; missing, malformed, duplicate, or conflicting lines cannot stop the loop successfully.
 
 ## Set up
 

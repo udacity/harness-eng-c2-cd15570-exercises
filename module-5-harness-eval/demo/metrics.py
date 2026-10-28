@@ -374,6 +374,16 @@ def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
             "reason": "study-plan metadata is unavailable",
         }
     first = results[0]
+    if not isinstance(first, dict):
+        return {
+            "planned_trials": None,
+            "recorded_planned_trials": None,
+            "plan_complete": False,
+            "core_scope": False,
+            "target_probes_complete": False,
+            "recommendation_ready": False,
+            "reason": "study-plan metadata is unavailable",
+        }
     configs = first.get("study_expected_configurations")
     tasks = first.get("study_expected_tasks")
     runs = first.get("study_expected_runs")
@@ -381,14 +391,16 @@ def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
     valid = (
         isinstance(configs, list)
         and bool(configs)
-        and len(configs) == len(set(configs))
         and all(isinstance(name, str) and name in CONFIGS for name in configs)
+        and len(configs) == len(set(configs))
         and isinstance(tasks, list)
         and bool(tasks)
-        and len(tasks) == len(set(tasks))
         and all(isinstance(name, str) and name for name in tasks)
+        and len(tasks) == len(set(tasks))
         and type(runs) is int
         and runs > 0
+        and type(declared) is int
+        and declared > 0
     )
     if not valid:
         return {
@@ -407,27 +419,44 @@ def _study_readiness(results: list[dict[str, Any]]) -> dict[str, Any]:
         for trial in range(1, runs + 1)
     }
     consistent = all(
-        row.get("study_expected_configurations") == configs
+        isinstance(row, dict)
+        and row.get("study_expected_configurations") == configs
         and row.get("study_expected_tasks") == tasks
         and row.get("study_expected_runs") == runs
         and row.get("study_expected_trials") == declared
         for row in results
     )
-    actual = {
-        (row.get("configuration"), row.get("task_id"), row.get("trial"))
-        for row in results
-    }
+    actual: set[tuple[str, str, int]] = set()
+    target_rows: dict[tuple[str, str, int], dict[str, Any]] = {}
+    result_keys_valid = True
+    for row in results:
+        if not isinstance(row, dict):
+            result_keys_valid = False
+            continue
+        configuration = row.get("configuration")
+        task_id = row.get("task_id")
+        trial = row.get("trial")
+        if not (
+            isinstance(configuration, str)
+            and configuration in configs
+            and isinstance(task_id, str)
+            and task_id in tasks
+            and type(trial) is int
+            and 1 <= trial <= runs
+        ):
+            result_keys_valid = False
+            continue
+        key = (configuration, task_id, trial)
+        actual.add(key)
+        target_rows[key] = row
     plan_complete = (
         consistent
+        and result_keys_valid
         and declared == len(planned)
         and actual == planned
         and len(results) == len(planned)
     )
     core_scope = set(configs) == set(CONFIGS) and CORE_TASK_IDS.issubset(set(tasks))
-    target_rows = {
-        (row.get("configuration"), row.get("task_id"), row.get("trial")): row
-        for row in results
-    }
     target_probes_complete = plan_complete and all(
         bool(target_rows.get((config_name, task_id, trial), {}).get(field))
         for config_name, task_id, field in (

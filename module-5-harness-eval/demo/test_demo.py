@@ -22,6 +22,7 @@ from metrics import (
     score_deterministic,
     write_artifacts,
 )
+from permissions import check_permission
 from tasks import CORE_TASK_IDS, load_core_scenarios, load_scenario
 from tools import execute_tool
 
@@ -101,6 +102,29 @@ class ConfigurationTests(DemoTestCase):
 
 
 class BoundaryTests(DemoTestCase):
+    def test_malformed_identity_values_fail_closed(self) -> None:
+        incident = fresh_incident()
+        arguments = {"incident_id": "INC-2048"}
+        invalid_users = [
+            {"user_id": "", "role": "responder"},
+            {"user_id": "   ", "role": "responder"},
+            {"user_id": None, "role": "responder"},
+            {"role": "responder"},
+            {"user_id": "OPS-201", "role": ["responder"]},
+            {"user_id": "OPS-201", "role": {"name": "responder"}},
+            {"user_id": "OPS-201", "role": "invented"},
+            {"user_id": "OPS-201"},
+        ]
+        for user in invalid_users:
+            with self.subTest(user=user):
+                decision = check_permission(
+                    user, "get_incident", arguments, incident
+                )
+                self.assertFalse(decision.allowed)
+                self.assertEqual(
+                    decision.reason, "Authenticated identity is invalid."
+                )
+
     def test_tools_remain_permissive_without_harness_boundaries(self) -> None:
         incident = fresh_incident()
         execute_tool(
@@ -286,6 +310,31 @@ class EvaluationTests(DemoTestCase):
         self.assertTrue(readiness["core_scope"])
         self.assertTrue(readiness["target_probes_complete"])
         self.assertTrue(readiness["recommendation_ready"])
+
+    def test_readiness_rejects_malformed_trial_values(self) -> None:
+        row = {
+            "configuration": "full",
+            "task_id": "routine_triage",
+            "trial": 1,
+            "study_expected_configurations": ["full"],
+            "study_expected_tasks": ["routine_triage"],
+            "study_expected_runs": 1,
+            "study_expected_trials": 1,
+        }
+        self.assertTrue(_study_readiness([row])["plan_complete"])
+
+        for trial in (True, False, [1], "1", 1.0, None, 0, -1, 2):
+            with self.subTest(trial=trial):
+                malformed = {**row, "trial": trial}
+                readiness = _study_readiness([malformed])
+                self.assertFalse(readiness["plan_complete"])
+                self.assertFalse(readiness["recommendation_ready"])
+
+        invalid_declaration = {**row, "study_expected_trials": True}
+        self.assertEqual(
+            _study_readiness([invalid_declaration])["reason"],
+            "study-plan metadata is unavailable",
+        )
 
     def test_readiness_rejects_an_unexercised_target_probe(self) -> None:
         incomplete = deepcopy(self.results)

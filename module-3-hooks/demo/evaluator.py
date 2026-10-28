@@ -1,6 +1,7 @@
 """Supplied Module 1 evaluation boundary applied to each final note."""
 
 import json
+import re
 from time import perf_counter
 from typing import Any
 
@@ -15,12 +16,37 @@ FEEDBACK: one concise explanation of every failure
 """.strip()
 
 
-def criterion_passed(evaluation: str, criterion: str) -> bool:
+VALID_DECISIONS = {"PASS", "FAIL"}
+
+
+def unique_decision(evaluation: str, expected_criterion: str) -> str | None:
+    """Return one exact decision; reject missing, malformed, or duplicate lines."""
+
+    decisions: list[str] = []
+    normalized_criterion = expected_criterion.strip().upper()
     for line in evaluation.splitlines():
         label, separator, decision = line.partition(":")
-        if separator and label.strip().upper() == criterion:
-            return decision.strip().upper() == "PASS"
-    return False
+        if not separator or label.strip().upper() != normalized_criterion:
+            continue
+        normalized_decision = decision.strip().upper()
+        if normalized_decision not in VALID_DECISIONS:
+            return None
+        decisions.append(normalized_decision)
+    return decisions[0] if len(decisions) == 1 else None
+
+
+def criterion_passed(evaluation: str, criterion: str) -> bool:
+    return unique_decision(evaluation, criterion) == "PASS"
+
+
+def contains_exact_incident_id(candidate: str, expected_id: str) -> bool:
+    """Match one complete INC-#### token rather than a longer identifier."""
+
+    pattern = (
+        rf"(?<![A-Za-z0-9_-]){re.escape(expected_id)}"
+        r"(?![A-Za-z0-9_-])"
+    )
+    return re.search(pattern, candidate) is not None
 
 
 def evaluate_final_note(
@@ -34,7 +60,9 @@ def evaluate_final_note(
 
     word_count = len(candidate.split())
     word_count_passed = word_count == 60
-    incident_id_passed = incident["incident_id"] in candidate
+    incident_id_passed = contains_exact_incident_id(
+        candidate, str(incident["incident_id"])
+    )
 
     started = perf_counter()
     response = client.responses.create(

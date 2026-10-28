@@ -30,10 +30,10 @@ final model response.
 
 **Guardrail:** The course's `load_skill` design is application code built on
 function calling. It is not a claim that the API automatically discovers or
-secures local `SKILL.md` files. The current demo closes its argument object with
-`additionalProperties: false` but does not set the provider's `strict: true`
-flag. The pseudocode example recommends that flag; the harness validates every
-call in either case.
+secures local `SKILL.md` files. The demo and completed exercise close the
+argument object with `additionalProperties: false`, set the provider's
+`strict: true` flag, and still validate every call inside the application
+resolver before file access.
 
 ## R3 — Prompt injection risk
 

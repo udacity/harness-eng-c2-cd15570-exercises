@@ -75,7 +75,7 @@ revoke_permit
 
 [`tools.py`](tools.py) validates tool argument shapes and performs simulated mutations. It has no role checks. For creation, the dispatcher injects the owner from the trusted identity; the model cannot choose an owner. Editing accepts only the project description, so it cannot overwrite ownership or status.
 
-[`permissions.py`](permissions.py) contains the permission matrix, tool mapping, ownership rules, and the central authorization function. Unknown tools, invalid identities, missing resource IDs, and missing applications fail closed.
+[`permissions.py`](permissions.py) contains the permission matrix, tool mapping, ownership rules, and the central authorization function. Unknown tools, identities without a nonblank string user ID and valid string role, missing resource IDs, and missing applications fail closed.
 
 ```text
 Model proposes a tool

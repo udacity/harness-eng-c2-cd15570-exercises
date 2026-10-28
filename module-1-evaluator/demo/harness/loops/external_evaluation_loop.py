@@ -9,6 +9,7 @@ from harness.loops.self_evaluation_loop import (
     criterion_passed,
     evaluate_own_response,
     passed,
+    unique_decision,
 )
 from harness.models import Attempt, RunResult, Scenario
 from harness.results import build_result
@@ -35,6 +36,16 @@ def extract_incident_id(request: str) -> str:
     return match.group()
 
 
+def contains_exact_incident_id(candidate: str, expected_id: str) -> bool:
+    """Match one complete INC-#### token rather than a longer identifier."""
+
+    pattern = (
+        rf"(?<![A-Za-z0-9_-]){re.escape(expected_id)}"
+        r"(?![A-Za-z0-9_-])"
+    )
+    return re.search(pattern, candidate) is not None
+
+
 def evaluate_deterministic_criteria(
     candidate: str,
     scenario: Scenario,
@@ -45,7 +56,7 @@ def evaluate_deterministic_criteria(
     expected_id = extract_incident_id(scenario.request)
     word_count = len(candidate.split())
     word_count_passed = word_count == expected_words
-    incident_id_passed = expected_id in candidate
+    incident_id_passed = contains_exact_incident_id(candidate, expected_id)
     results = [
         (
             f"WORD_COUNT: {'PASS' if word_count_passed else 'FAIL'} "
@@ -60,15 +71,21 @@ def evaluate_deterministic_criteria(
 
 
 def deterministic_criterion_passed(results: list[str], criterion: str) -> bool:
-    return any(result.startswith(f"{criterion}: PASS") for result in results)
+    decisions: list[str] = []
+    normalized_criterion = criterion.strip().upper()
+    for result in results:
+        label, separator, detail = result.partition(":")
+        if not separator or label.strip().upper() != normalized_criterion:
+            continue
+        fields = detail.strip().split(maxsplit=1)
+        if not fields or fields[0].upper() not in {"PASS", "FAIL"}:
+            return False
+        decisions.append(fields[0].upper())
+    return decisions == ["PASS"]
 
 
 def inferential_criterion_passed(evaluation: str, criterion: str) -> bool:
-    for line in evaluation.splitlines():
-        label, separator, decision = line.partition(":")
-        if separator and label.strip().upper() == criterion:
-            return decision.strip().upper() == "PASS"
-    return False
+    return unique_decision(evaluation, criterion) == "PASS"
 
 
 def evaluator_feedback(evaluation: str) -> str:
