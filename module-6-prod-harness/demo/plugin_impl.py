@@ -63,6 +63,7 @@ class IncidentResponsePlugin:
         self.safety = SafetyHook()
         self.completion = CompletionHook()
         self._skills_recorded = False
+        self._completion_checked = False
 
     @classmethod
     def from_environment(cls) -> "IncidentResponsePlugin":
@@ -104,7 +105,7 @@ class IncidentResponsePlugin:
         ctx.register_hook("pre_llm_call", self.before_model)
         ctx.register_hook("pre_tool_call", self.before_tool)
         ctx.register_hook("post_tool_call", self.after_tool)
-        ctx.register_hook("pre_verify", self.before_completion)
+        ctx.register_hook("on_session_end", self.after_session)
         self.trace.record(
             "run_started",
             scenario=self.scenario_name,
@@ -233,26 +234,23 @@ class IncidentResponsePlugin:
             result=parsed,
         )
 
-    def before_completion(self, **_: Any) -> dict[str, str] | None:
+    def after_session(self, **_: Any) -> None:
+        if self._completion_checked:
+            return
+        self._completion_checked = True
         decision = self.completion.check(
             self.scenario, self.incident, self.trace.events
         )
-        self.trace.record("hook_decision", **decision.to_dict())
+        self.trace.record(
+            "hook_decision", source="on_session_end", **decision.to_dict()
+        )
         if decision.allowed:
             self.trace.record(
                 "completion",
                 status="completed",
+                source="on_session_end",
                 final_deployment=self.incident["current_deployment"],
             )
-            return None
-        return {
-            "action": "continue",
-            "message": (
-                "Completion was blocked. Use the registered evidence tools and "
-                "attempt the exact rollback requested by the operator. Then report "
-                "the authoritative permission, hook, and execution outcome."
-            ),
-        }
 
     def _save_state(self) -> None:
         self.state_path.write_text(
@@ -292,7 +290,12 @@ def register_for_validation(ctx: Any, demo_dir: Path) -> None:
             skills_root / name / "SKILL.md",
             description=TOOL_SKILL_DESCRIPTIONS[name],
         )
-    for event in ("pre_llm_call", "pre_tool_call", "post_tool_call", "pre_verify"):
+    for event in (
+        "pre_llm_call",
+        "pre_tool_call",
+        "post_tool_call",
+        "on_session_end",
+    ):
         ctx.register_hook(event, lambda **_: None)
 
 

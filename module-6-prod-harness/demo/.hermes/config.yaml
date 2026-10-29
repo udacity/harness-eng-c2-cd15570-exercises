@@ -6,6 +6,10 @@ platform_toolsets:
   cli:
     - incident-response-demo
 
+tools:
+  tool_search:
+    enabled: "off"
+
 skills:
   project_discovery: false
 

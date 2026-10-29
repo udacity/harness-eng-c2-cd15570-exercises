@@ -1,5 +1,31 @@
 # Production Harnesses: Python Loop versus Hermes
 
+## Set up Hermes in the Udacity workspace
+
+Exercise 6 requires the real Hermes runtime. The minimal Debian/Ubuntu student
+workspace does not provide `sudo`, and its managed Node.js runtime may require
+`libatomic.so.1`. From the repository root, use the supplied no-sudo bootstrap:
+
+```bash
+cd module-6-prod-harness
+bash setup_hermes_workspace.sh
+source activate_hermes_workspace.sh
+hermes setup
+hermes config set model.api_mode chat_completions
+hermes config get model --json
+cd ..
+```
+
+The bootstrap downloads the distribution's `libatomic1` package without
+installing it system-wide, extracts it under the ignored `.runtime/` directory,
+runs the official Hermes installer, and verifies the installation-bound
+runtime. Source `activate_hermes_workspace.sh` in every new terminal before
+running Hermes or the Hermes exercise tests. It also sets `HERMES_CLI` for the
+supplied runners. The course's tested model route is `gpt-4.1-mini` through
+Vocareum using `chat_completions`. That API mode prevents Hermes from sending
+the unsupported `reasoning.effort` field. Confirm that the displayed model
+configuration contains `"api_mode": "chat_completions"`.
+
 ## Your assignment
 
 Work through Tasks 1–7 in order. Your coding task is specifically to make the
@@ -194,7 +220,13 @@ Each harness receives an identical fresh copy of this incomplete function. Durin
 
 Before implementing `connect_to_xyz_api()`, the agent must retrieve the contract from `GET http://localhost:8080/api-docs` and use it to construct the `/v2/data-sync` request; the run trace must record this documentation call.
 
-The behavioral tests call this function and confirm that a successful result contains `status == "synced"`, a non-empty `sync_id`, a timestamp, and the expected client information. Separate API fixtures confirm that malformed authentication and requests produce the documented structured JSON errors.
+The behavioral tests snapshot the supplied server's ignored request journal,
+call this function, and require exactly one new successful request. They verify
+the `POST /v2/data-sync` endpoint, required headers, JSON body, and that the
+client returns the exact response generated for that request. This prevents a
+client that merely returns a fixed success dictionary from passing. Separate
+API fixtures confirm that malformed authentication and requests produce the
+documented structured JSON errors.
 
 You do not manually write the missing function during the measured runs. You connect the supplied controls to each loop and let each agent produce its own implementation.
 
@@ -335,26 +367,34 @@ Each harness has its own policy files, and both policies enforce the same defaul
 Every permission decision must appear in the run trace with the harness name, requested capability, decision, matching rule, and denial reason. A denial must return to the agent as a normal tool result and must not crash the loop.
 
 The permission policy governs agent-requested tools. The supplied behavioral
-test executes the generated client as normal Python code; it verifies the
-expected localhost request but is not an operating-system network sandbox.
+test executes the generated client as normal Python code. It checks the new
+entry in `api_server/requests.jsonl` against the returned server response, but
+it is not an operating-system network sandbox. The journal is generated
+evidence and is ignored by Git.
 
 ## Task 1: Start and verify the supplied API server
 
 Complete this task before testing or configuring either harness. The API server is a finished dependency. The agents will not implement or modify any of its endpoints.
 
-From the starter directory, start the server in one terminal:
+From the repository root, start the server in one terminal:
 
 ```bash
 cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/server.py
 ```
 
-Leave that process running. In a second terminal, run the supplied server tests:
+Leave that process running. In a second terminal, start from the repository root
+and run the supplied server tests:
 
 ```bash
 cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/tests/test_api_server.py
 ```
+
+The server records each POST attempt and its generated response in
+`api_server/requests.jsonl`. The client behavioral tests compare
+the journal before and after each call, so earlier records do not affect later
+test runs.
 
 The tests make real requests to `http://localhost:8080` and verify:
 
@@ -370,7 +410,7 @@ All these endpoints must already work. The harness agents do not develop `/v2/da
 
 Complete this task before changing any integration code or configuration.
 
-Change to the starter directory:
+From the repository root, change to the starter directory:
 
 ```bash
 cd module-6-prod-harness/exercise-prod-harness-starter
@@ -390,8 +430,16 @@ and provider:
 
 ```bash
 hermes --version
+hermes config set model.api_mode chat_completions
 hermes config get model --json
 ```
+
+For the tested course route, the JSON output must show `gpt-4.1-mini`, the
+Vocareum base URL, and `"api_mode": "chat_completions"`. Run the configuration
+command against the normal source profile before starting the tests. The
+runner copies that API mode into its isolated temporary profile and stops with
+an actionable error before a provider call if the Vocareum route is
+misconfigured.
 
 The Hermes runner defaults to `$HOME/.local/bin/hermes`. If Hermes is
 installed elsewhere, point the runner to it before continuing:
@@ -741,15 +789,16 @@ task. Each harness must independently discover the local contract and replace
 ### Keep the local API server running
 
 The two harnesses use the same supplied local server. If it is not already
-running, start it in a separate terminal and leave that terminal open:
+running, start it from the repository root in a separate terminal and leave
+that terminal open:
 
 ```bash
 cd module-6-prod-harness/exercise-prod-harness-starter
 python3 api_server/server.py
 ```
 
-From the terminal where you will run the harnesses, confirm the server is
-healthy:
+From the repository root in the terminal where you will run the harnesses,
+confirm the server is healthy:
 
 ```bash
 cd module-6-prod-harness/exercise-prod-harness-starter

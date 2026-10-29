@@ -17,10 +17,10 @@
 #
 # Debian / Ubuntu / WSL2:
 #   sudo apt update
-#   sudo apt install -y git curl xz-utils build-essential
+#   sudo apt install -y git curl xz-utils build-essential libatomic1
 #
 # Fedora / RHEL:
-#   sudo dnf install -y git curl xz gcc-c++ make
+#   sudo dnf install -y git curl xz gcc-c++ make libatomic
 #
 # macOS:
 #   xcode-select --install
@@ -39,6 +39,8 @@
 #   code when a compatible prebuilt package is unavailable. On Debian/Ubuntu,
 #   `build-essential` supplies gcc, g++, make, and the standard development
 #   headers. Xcode Command Line Tools supplies clang/clang++ on macOS.
+#   The managed Node.js runtime also needs `libatomic.so.1` on glibc Linux.
+#   Debian/Ubuntu provide it in `libatomic1`; Fedora/RHEL provide `libatomic`.
 #
 #   This requirement does NOT mean Hermes Desktop must be installed. The
 #   official installer installs the CLI without Desktop by default; Desktop is
@@ -51,6 +53,16 @@
 # ---------------------------------------------------------------------------
 # 2. INSTALL HERMES CLI (SUPPORTED METHOD)
 # ---------------------------------------------------------------------------
+#
+# Udacity Debian/Ubuntu workspace without sudo:
+#   bash setup_hermes_workspace.sh
+#   source activate_hermes_workspace.sh
+#
+# The workspace script downloads and extracts libatomic1 into `.runtime/`,
+# runs the same official installer below, and verifies the managed runtime.
+# Source the activation script in every new terminal before using Hermes.
+#
+# Other supported environments with the system prerequisites installed:
 #
 # Linux / macOS / WSL2:
 #   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | \
@@ -70,7 +82,7 @@
 #   - a managed Node.js runtime
 #   - ripgrep
 #   - ffmpeg
-#   - a Hermes virtual environment
+#   - an installation-managed Python environment
 #
 # PyPI installation (`pip install hermes-agent`) is not a supported Hermes
 # distribution method. Do not add hermes-agent as a requirement below.
@@ -78,8 +90,14 @@
 # After installation, reload the shell and verify/configure Hermes:
 #   source ~/.zshrc                 # or: source ~/.bashrc
 #   hermes --version
+#   hermes --print-runtime-command   # prints the installation-bound JSON argv
 #   hermes setup                    # choose a provider and model
+#   hermes config set model.api_mode chat_completions
 #   hermes config get model --json
+#
+# The course's tested gpt-4.1-mini route through Vocareum requires
+# model.api_mode=chat_completions. Verify that the JSON output contains that
+# value before running the Module 6 demo or exercise.
 #
 # ---------------------------------------------------------------------------
 # 3. INSTALL THE MODULE 6 PYTHON DEPENDENCIES

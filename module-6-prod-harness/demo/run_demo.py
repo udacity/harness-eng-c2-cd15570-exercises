@@ -12,8 +12,10 @@ import shutil
 import subprocess
 import tempfile
 from typing import Any, Iterator
+from urllib.parse import urlparse
 
-from data import SCENARIOS, fresh_incident, task_prompt
+from components.hooks import CompletionHook, HookDecision, RunTrace
+from data import SCENARIOS, fresh_incident, scenario, task_prompt
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,6 +26,9 @@ TRACE_FILE = RUNS_DIR / "run.jsonl"
 USAGE_FILE = RUNS_DIR / "usage.json"
 RESULT_FILE = RUNS_DIR / "run-result.json"
 DEFAULT_HERMES_BIN = Path("/Users/peter/.local/bin/hermes")
+VOCAREUM_HOST = "openai.vocareum.com"
+VOCAREUM_MODEL = "gpt-4.1-mini"
+VOCAREUM_API_MODE = "chat_completions"
 
 
 def parse_args() -> argparse.Namespace:
@@ -103,7 +108,31 @@ def resolve_model(
         for key in ("base_url", "api_mode"):
             if isinstance(configured.get(key), str) and configured[key].strip():
                 resolved[key] = configured[key].strip()
+    _validate_course_model_route(resolved)
     return resolved
+
+
+def _validate_course_model_route(settings: dict[str, str]) -> None:
+    """Reject the known-incompatible default wire mode before a provider call."""
+
+    hostname = (urlparse(settings.get("base_url", "")).hostname or "").lower()
+    model = settings.get("model", "").strip().lower().rsplit("/", 1)[-1]
+    is_course_model = model == VOCAREUM_MODEL or model.startswith(
+        f"{VOCAREUM_MODEL}-"
+    )
+    if (
+        hostname == VOCAREUM_HOST
+        and is_course_model
+        and settings.get("api_mode", "").strip().lower() != VOCAREUM_API_MODE
+    ):
+        raise SystemExit(
+            "The Vocareum gpt-4.1-mini route requires Hermes API mode "
+            "chat_completions. Configure the source Hermes profile before "
+            "running the demo:\n"
+            "  hermes config set model.api_mode chat_completions\n"
+            "Then verify it with:\n"
+            "  hermes config get model --json"
+        )
 
 
 def _profile_config(model: dict[str, str]) -> str:
@@ -198,9 +227,9 @@ def _prepare_run() -> None:
     RESULT_FILE.write_text("{}\n", encoding="utf-8")
 
 
-def _events() -> list[dict[str, Any]]:
+def _events(trace_file: Path = TRACE_FILE) -> list[dict[str, Any]]:
     events = []
-    for line in TRACE_FILE.read_text(encoding="utf-8").splitlines():
+    for line in trace_file.read_text(encoding="utf-8").splitlines():
         try:
             value = json.loads(line)
         except json.JSONDecodeError:
@@ -210,7 +239,43 @@ def _events() -> list[dict[str, Any]]:
     return events
 
 
-def _print_summary(scenario_name: str, returncode: int) -> None:
+def _postflight_decision(
+    scenario_name: str,
+    *,
+    state_file: Path = STATE_FILE,
+    trace_file: Path = TRACE_FILE,
+) -> HookDecision:
+    incident = json.loads(state_file.read_text(encoding="utf-8"))
+    events = _events(trace_file)
+    decision = CompletionHook().check(scenario(scenario_name), incident, events)
+    trace = RunTrace(trace_file)
+    trace.record("postflight_decision", source="runner", **decision.to_dict())
+    if decision.allowed and not any(
+        event.get("event") == "completion"
+        and event.get("status") == "completed"
+        for event in events
+    ):
+        trace.record(
+            "completion",
+            status="completed",
+            source="runner_postflight",
+            final_deployment=incident["current_deployment"],
+        )
+    return decision
+
+
+def _effective_exit_code(hermes_returncode: int, completed: bool) -> int:
+    if hermes_returncode != 0:
+        return hermes_returncode
+    return 0 if completed else 1
+
+
+def _print_summary(
+    scenario_name: str,
+    hermes_returncode: int,
+    demo_exit_code: int,
+    decision: HookDecision,
+) -> None:
     incident = json.loads(STATE_FILE.read_text(encoding="utf-8"))
     events = _events()
     permission_denials = sum(
@@ -224,14 +289,12 @@ def _print_summary(scenario_name: str, returncode: int) -> None:
         and event.get("hook") != "completion_verification"
         for event in events
     )
-    completed = any(
-        event.get("event") == "completion" and event.get("status") == "completed"
-        for event in events
-    )
     record = {
         "scenario": scenario_name,
-        "hermes_returncode": returncode,
-        "completed": completed,
+        "hermes_returncode": hermes_returncode,
+        "demo_exit_code": demo_exit_code,
+        "completed": decision.allowed,
+        "completion_reason": decision.reason,
         "final_deployment": incident["current_deployment"],
         "permission_denials": permission_denials,
         "hook_blocks": hook_blocks,
@@ -276,9 +339,11 @@ def main() -> None:
         except subprocess.TimeoutExpired:
             returncode = 124
             print(f"Hermes exceeded the {args.timeout}-second limit.")
-    _print_summary(args.scenario, returncode)
-    if returncode != 0:
-        raise SystemExit(returncode)
+    decision = _postflight_decision(args.scenario)
+    exit_code = _effective_exit_code(returncode, decision.allowed)
+    _print_summary(args.scenario, returncode, exit_code, decision)
+    if exit_code != 0:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

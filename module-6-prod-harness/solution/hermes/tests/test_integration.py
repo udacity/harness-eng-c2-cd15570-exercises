@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from unittest.mock import patch
 from urllib.error import URLError
 from urllib.request import urlopen
+
+import pytest
 
 from hermes.components.hooks import CompletionHook, RepeatedCallHook, RunTrace, SyntaxHook
 from hermes.components.permissions import PermissionPolicy
@@ -18,17 +22,44 @@ from hermes.configured_plugin import (
     TOOL_SCHEMAS,
 )
 from hermes.run_exercise import (
+    BEHAVIOR_TEST,
     HERMES_DIR,
     PROFILE_TEMPLATE,
     TASK_TEMPLATE,
     _read_trace,
     _profile_config,
+    _validate_course_model_route,
     hermes_binary,
+    hermes_runtime_command,
     invoke_hermes,
     resolve_model_settings,
-    source_hermes_home,
     temporary_profile,
 )
+
+
+def test_completion_rejects_a_client_that_fabricates_success() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        directory = Path(temp_dir)
+        client_path = directory / "xyz_api_client.py"
+        client_path.write_text(
+            "def connect_to_xyz_api():\n"
+            "    return {\n"
+            "        'status': 'synced',\n"
+            "        'sync_id': 'fake',\n"
+            "        'timestamp': 'fake',\n"
+            "        'received_client': 'fake',\n"
+            "        'payload_size': 0,\n"
+            "    }\n",
+            encoding="utf-8",
+        )
+        result_path = directory / "test-results.json"
+        request_log = directory / "requests.jsonl"
+
+        with patch.dict(os.environ, {"XYZ_API_REQUEST_LOG": str(request_log)}):
+            decision = CompletionHook(BEHAVIOR_TEST, result_path).check(client_path)
+
+    assert not decision.allowed
+    assert decision.details["returncode"] != 0
 
 
 COMPONENT_PROBE_TASK = """Exercise the configured Hermes components without implementing the client.
@@ -437,20 +468,101 @@ def test_completion_hook_writes_fixed_test_evidence() -> None:
 def test_runtime_config_enables_only_the_exercise_plugin_toolset() -> None:
     config = (PROFILE_TEMPLATE / "config.yaml").read_text(encoding="utf-8")
     rendered = _profile_config(
-        {"provider": "openrouter", "model": "openai/gpt-4o", "base_url": "https://example.test/v1"}
+        {
+            "provider": "vocareum",
+            "model": "gpt-4.1-mini",
+            "base_url": "https://openai.vocareum.com/v1",
+            "api_mode": "chat_completions",
+        }
     )
 
     assert "xyz-api-harness" in config
     assert "allow_tool_override: true" in config
     assert "max_verify_nudges: 5" in config
-    assert 'provider: "openrouter"' in rendered
-    assert 'default: "openai/gpt-4o"' in rendered
+    assert 'provider: "vocareum"' in rendered
+    assert 'default: "gpt-4.1-mini"' in rendered
+    assert 'api_mode: "chat_completions"' in rendered
+
+
+def test_vocareum_gpt_4_1_mini_requires_chat_completions() -> None:
+    route = {
+        "provider": "vocareum",
+        "model": "gpt-4.1-mini",
+        "base_url": "https://openai.vocareum.com/v1",
+    }
+
+    with pytest.raises(SystemExit, match="model.api_mode chat_completions"):
+        _validate_course_model_route(route)
+
+    _validate_course_model_route({**route, "api_mode": "chat_completions"})
+
+
+def test_source_profile_api_mode_reaches_isolated_profile(monkeypatch) -> None:
+    configured = {
+        "provider": "vocareum",
+        "default": "gpt-4.1-mini",
+        "base_url": "https://openai.vocareum.com/v1",
+        "api_mode": "chat_completions",
+    }
+
+    def fake_run(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, json.dumps(configured), "")
+
+    monkeypatch.setattr("hermes.run_exercise.subprocess.run", fake_run)
+    settings = resolve_model_settings(
+        Path("/usr/local/bin/hermes"),
+        model_override=None,
+        provider_override=None,
+    )
+
+    assert settings["api_mode"] == "chat_completions"
+    assert 'api_mode: "chat_completions"' in _profile_config(settings)
+
+
+def test_runtime_command_uses_launcher_managed_argv(monkeypatch) -> None:
+    environment = {"HERMES_HOME": "/tmp/test-profile"}
+    expected = ["/managed/python", "-I", "-c", "bootstrap"]
+
+    def fake_run(command, **kwargs):
+        assert command == [
+            "/usr/local/bin/hermes",
+            "--print-runtime-command",
+            "--module",
+            "code",
+            "--",
+            "-q",
+        ]
+        assert kwargs["env"] == environment
+        return subprocess.CompletedProcess(command, 0, json.dumps(expected), "")
+
+    monkeypatch.setattr("hermes.run_exercise.subprocess.run", fake_run)
+
+    command = hermes_runtime_command(
+        Path("/usr/local/bin/hermes"),
+        module="code",
+        arguments=("-q",),
+        environment=environment,
+    )
+
+    assert command == expected
+
+
+def test_runtime_command_rejects_malformed_launcher_output(monkeypatch) -> None:
+    def fake_run(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, '{"python": "/managed/python"}', "")
+
+    monkeypatch.setattr("hermes.run_exercise.subprocess.run", fake_run)
+
+    try:
+        hermes_runtime_command(Path("/usr/local/bin/hermes"), module="code")
+    except RuntimeError as exc:
+        assert "non-empty JSON array of strings" in str(exc)
+    else:
+        raise AssertionError("Malformed launcher output must be rejected")
 
 
 def test_installed_hermes_loads_plugin_offline() -> None:
     binary = hermes_binary()
-    runtime_root = source_hermes_home() / "hermes-agent"
-    runtime_python = runtime_root / "venv" / "bin" / "python"
     with tempfile.TemporaryDirectory() as temp_dir:
         trace_file = Path(temp_dir) / "trace.jsonl"
         with temporary_profile(
@@ -477,34 +589,38 @@ def test_installed_hermes_loads_plugin_offline() -> None:
                 env=environment,
                 cwd=HERMES_DIR,
             )
+            runtime_command = hermes_runtime_command(
+                binary,
+                module="code",
+                arguments=("-q",),
+                environment=environment,
+            )
             preload = subprocess.run(
-                [
-                    str(runtime_python),
-                    "-c",
-                    (
-                        "import json; "
-                        "from hermes_cli.plugins import discover_plugins; "
-                        "discover_plugins(); "
-                        "from agent.skill_commands import build_preloaded_skills_prompt; "
-                        "prompt, loaded, missing = build_preloaded_skills_prompt("
-                        "['xyz-api-harness:xyz-api-client']); "
-                        "from model_tools import handle_function_call; "
-                        f"read_result = handle_function_call('read_file', "
-                        f"{{'path': {str(TASK_TEMPLATE)!r}}}, "
-                        "enabled_toolsets=['xyz-api-harness']); "
-                        "denied_result = handle_function_call('web_search', "
-                        "{'query': 'XYZ API'}, enabled_toolsets=['xyz-api-harness']); "
-                        "print(json.dumps({'has_prompt': bool(prompt), "
-                        "'loaded': loaded, 'missing': missing, "
-                        "'read_result': read_result, 'denied_result': denied_result}))"
-                    ),
-                ],
+                runtime_command,
+                input=(
+                    "import json; "
+                    "from hermes_cli.plugins import discover_plugins; "
+                    "discover_plugins(); "
+                    "from agent.skill_commands import build_preloaded_skills_prompt; "
+                    "prompt, loaded, missing = build_preloaded_skills_prompt("
+                    "['xyz-api-harness:xyz-api-client']); "
+                    "from model_tools import handle_function_call; "
+                    f"read_result = handle_function_call('read_file', "
+                    f"{{'path': {str(TASK_TEMPLATE)!r}}}, "
+                    "enabled_toolsets=['xyz-api-harness']); "
+                    "denied_result = handle_function_call('web_search', "
+                    "{'query': 'XYZ API'}, enabled_toolsets=['xyz-api-harness']); "
+                    "print(json.dumps({'has_prompt': bool(prompt), "
+                    "'loaded': loaded, 'missing': missing, "
+                    "'read_result': read_result, 'denied_result': denied_result}))\n"
+                    "exit()\n"
+                ),
                 capture_output=True,
                 text=True,
                 timeout=30,
                 check=False,
                 env=environment,
-                cwd=runtime_root,
+                cwd=HERMES_DIR,
             )
             trace_events = [
                 json.loads(line)
@@ -516,7 +632,12 @@ def test_installed_hermes_loads_plugin_offline() -> None:
     assert prompt_size.returncode == 0, prompt_size.stderr
     assert "xyz-api-harness" not in prompt_size.stderr
     assert preload.returncode == 0, preload.stderr
-    preload_result = json.loads(preload.stdout.strip().splitlines()[-1])
+    preload_result = next(
+        json.loads(candidate)
+        for line in reversed(preload.stdout.splitlines())
+        for candidate in [line.strip().removeprefix(">>> ").removeprefix("... ")]
+        if candidate.startswith("{")
+    )
     assert preload_result["has_prompt"] is True
     assert preload_result["loaded"] == ["xyz-api-harness:xyz-api-client"]
     assert preload_result["missing"] == []

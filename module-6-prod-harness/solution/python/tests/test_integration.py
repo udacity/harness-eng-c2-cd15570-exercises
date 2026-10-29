@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -14,10 +16,36 @@ from python.components.hooks import CompletionHook, RepeatedCallHook, SyntaxHook
 from python.components.permissions import PermissionPolicy
 from python.loop.configured_agent_loop import HandBuiltAgentLoop, RunTrace, TOOL_DEFINITIONS
 from python.run_exercise import (
+    BEHAVIOR_TEST,
     SKILL_FILE,
     TASK_TEMPLATE,
     create_model_client,
 )
+
+
+def test_completion_rejects_a_client_that_fabricates_success() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        directory = Path(temp_dir)
+        client_path = directory / "xyz_api_client.py"
+        client_path.write_text(
+            "def connect_to_xyz_api():\n"
+            "    return {\n"
+            "        'status': 'synced',\n"
+            "        'sync_id': 'fake',\n"
+            "        'timestamp': 'fake',\n"
+            "        'received_client': 'fake',\n"
+            "        'payload_size': 0,\n"
+            "    }\n",
+            encoding="utf-8",
+        )
+        result_path = directory / "test-results.json"
+        request_log = directory / "requests.jsonl"
+
+        with patch.dict(os.environ, {"XYZ_API_REQUEST_LOG": str(request_log)}):
+            decision = CompletionHook(BEHAVIOR_TEST, result_path).check(client_path)
+
+    assert not decision.allowed
+    assert decision.details["returncode"] != 0
 
 
 COMPONENT_PROBE_TASK = """Exercise the configured harness components without implementing the client.

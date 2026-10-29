@@ -20,8 +20,32 @@ API Specification (2026 Standard):
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import os
+from pathlib import Path
 import uuid
 from datetime import datetime
+
+
+REQUEST_LOG = Path(
+    os.environ.get("XYZ_API_REQUEST_LOG")
+    or Path(__file__).with_name("requests.jsonl")
+).expanduser().resolve()
+
+
+def record_post_request(*, path, headers, body, status, response):
+    """Persist the request and response used by the client completion oracle."""
+
+    record = {
+        "method": "POST",
+        "path": path,
+        "headers": {name.lower(): value for name, value in headers.items()},
+        "body": body,
+        "status": status,
+        "response": response,
+    }
+    REQUEST_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with REQUEST_LOG.open("a", encoding="utf-8") as target:
+        target.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 class XYZAPIHandler(BaseHTTPRequestHandler):
@@ -36,29 +60,51 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response_body)
 
+    def send_post_response(self, status_code, data, body):
+        record_post_request(
+            path=self.path,
+            headers=self.headers,
+            body=body,
+            status=status_code,
+            response=data,
+        )
+        self.send_json_response(status_code, data)
+
     def do_POST(self):
         # Always consume the request body before returning a response. Leaving
         # unread POST data in the socket can cause macOS to reset the connection
         # while the client is reading an otherwise valid JSON error response.
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length)
+        try:
+            recorded_body = json.loads(body)
+        except json.JSONDecodeError:
+            recorded_body = body.decode("utf-8", errors="replace")
 
         if self.path != '/v2/data-sync':
-            self.send_json_response(404, {"error": "Not Found"})
+            self.send_post_response(404, {"error": "Not Found"}, recorded_body)
             return
 
         # Validate authentication header
         auth_header = self.headers.get('Authorization', '')
 
         if not auth_header.startswith('Bearer '):
-            self.send_json_response(401, {"error": "Missing or malformed Authorization header"})
+            self.send_post_response(
+                401,
+                {"error": "Missing or malformed Authorization header"},
+                recorded_body,
+            )
             return
 
         token = auth_header[7:]  # Remove "Bearer " prefix
 
         # 2026 XYZ API requires tokens starting with "xyz-jwt-"
         if not token.startswith('xyz-jwt-'):
-            self.send_json_response(401, {"error": "Invalid token format. Expected xyz-jwt-*"})
+            self.send_post_response(
+                401,
+                {"error": "Invalid token format. Expected xyz-jwt-*"},
+                recorded_body,
+            )
             return
 
         # Validate required headers
@@ -66,22 +112,34 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
         api_version = self.headers.get('X-API-Version', '')
 
         if not client_id:
-            self.send_json_response(400, {"error": "Missing X-Client-ID header"})
+            self.send_post_response(
+                400, {"error": "Missing X-Client-ID header"}, recorded_body
+            )
             return
 
         if api_version != '2026-03':
-            self.send_json_response(400, {"error": f"Unsupported API version. Required: 2026-03, Got: {api_version}"})
+            self.send_post_response(
+                400,
+                {"error": f"Unsupported API version. Required: 2026-03, Got: {api_version}"},
+                recorded_body,
+            )
             return
 
         # Parse request body
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
-            self.send_json_response(400, {"error": "Invalid JSON body"})
+            self.send_post_response(
+                400, {"error": "Invalid JSON body"}, recorded_body
+            )
             return
 
         if 'client' not in payload or 'payload' not in payload:
-            self.send_json_response(400, {"error": "Missing 'client' or 'payload' fields"})
+            self.send_post_response(
+                400,
+                {"error": "Missing 'client' or 'payload' fields"},
+                payload,
+            )
             return
 
         # Success response with 2026 XYZ API format
@@ -92,7 +150,7 @@ class XYZAPIHandler(BaseHTTPRequestHandler):
             "received_client": payload["client"],
             "payload_size": len(str(payload["payload"]))
         }
-        self.send_json_response(200, response)
+        self.send_post_response(200, response, payload)
 
     def do_GET(self):
         if self.path == '/health':

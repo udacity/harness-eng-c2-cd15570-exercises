@@ -7,8 +7,9 @@ confirmed.
 
 Module 6 packages the accumulated harness as a Hermes plugin and runs it with
 the Hermes CLI. Hermes owns the model lifecycle, tool-call continuation,
-preloaded skills, hook dispatch, completion nudges, session behavior, and usage
-accounting. The repository supplies only the incident-specific extension:
+preloaded skills, hook dispatch, session behavior, and usage accounting. The
+repository supplies the incident-specific extension and the terminal outcome
+check:
 
 - six scoped incident tools;
 - two preloadable incident-response skills;
@@ -52,6 +53,18 @@ write new run evidence.
 
 ## Prerequisites
 
+In the no-sudo Udacity Debian/Ubuntu workspace, install and activate Hermes
+from the Module 6 directory first:
+
+```bash
+cd module-6-prod-harness
+bash setup_hermes_workspace.sh
+source activate_hermes_workspace.sh
+```
+
+The bootstrap supplies the missing `libatomic.so.1` in user space and verifies
+the Hermes managed runtime. Source the activation script in every new terminal.
+
 Confirm that Hermes is installed and has a model/provider configured:
 
 ```bash
@@ -64,6 +77,18 @@ If Hermes is not configured yet, run:
 ```bash
 hermes setup
 ```
+
+For the course's tested `gpt-4.1-mini` route through Vocareum, force the
+Chat Completions wire format and verify that it was saved:
+
+```bash
+hermes config set model.api_mode chat_completions
+hermes config get model --json
+```
+
+The output must contain `"api_mode": "chat_completions"`. The demo copies this
+setting into its isolated temporary profile. Without it, Vocareum rejects the
+unsupported `reasoning.effort` field before the first model turn.
 
 The demo uses only Python's standard library. It does not need a separate API
 server or additional packages.
@@ -85,11 +110,16 @@ methods:
 ```text
 ctx.register_tool(...)   six incident tools in one toolset
 ctx.register_skill(...)  incident_triage and safe_remediation
-ctx.register_hook(...)   pre_llm_call, pre_tool_call, post_tool_call, pre_verify
+ctx.register_hook(...)   pre_llm_call, pre_tool_call, post_tool_call, on_session_end
 ```
 
 The isolated profile enables the plugin and exposes its toolset on the CLI
-platform through `.hermes/config.yaml`.
+platform through `.hermes/config.yaml`. Because this demo has a fixed set of
+only six tools, the profile also sets `tools.tool_search.enabled` to `"off"`.
+Hermes therefore exposes those schemas directly instead of asking the model to
+discover them through `tool_search` and `tool_describe`. This changes tool
+presentation, not authorization: the permission and safety hooks still govern
+every proposed incident-tool call.
 
 ## Inspect the real Hermes command
 
@@ -153,6 +183,8 @@ that the target is last-known-good, and the tool changes the deployment.
 Expected core outcome:
 
 ```text
+hermes_returncode    0
+demo_exit_code       0
 completed            True
 final_deployment     checkout-v41
 ```
@@ -171,6 +203,8 @@ hook or tool can execute.
 Expected core outcome:
 
 ```text
+hermes_returncode    0
+demo_exit_code       0
 completed            True
 final_deployment     checkout-v42
 permission_denials   at least 1
@@ -189,6 +223,8 @@ it. This keeps authorization and deterministic safety as separate decisions.
 Expected core outcome:
 
 ```text
+hermes_returncode    0
+demo_exit_code       0
 completed            True
 final_deployment     checkout-v42
 hook_blocks          at least 1
@@ -234,11 +270,18 @@ result            v
               Hermes continues the model turn
 ```
 
-When the model attempts to finish, `pre_verify` checks authoritative incident
-state and boundary evidence. If the requested rollback has not executed, been
-denied, or been blocked as expected for that scenario, the hook returns
-`action: continue`. Hermes delivers the corrective nudge and keeps the session
-running. A passing verification writes the final `completion` event.
+At the end of every session, `on_session_end` checks authoritative incident
+state and boundary evidence and records its decision. This observer hook is
+appropriate for reliable lifecycle evidence, but it cannot make the model take
+another turn.
+
+After Hermes exits, `run_demo.py` independently applies the same scenario
+oracle to final state and trace evidence. This postflight check is the
+authoritative process boundary: a passing decision writes a `completion`
+event, while an incomplete outcome sets `completed` to `False` and makes the
+demo exit nonzero. A `hermes_returncode` of `0` therefore means the Hermes
+conversation ended normally; only `demo_exit_code: 0` means the required
+production outcome was also reached.
 
 ## Inspect the evidence
 
@@ -274,7 +317,8 @@ Useful trace events include:
 | `permission_decision` | The trusted role/action/resource rule ran before each tool. |
 | `hook_decision` | Repetition, mutation safety, or completion verification ran at its lifecycle boundary. |
 | `tool_result` | The registered tool's authoritative execution result returned to Hermes. |
-| `completion` | `pre_verify` accepted the scenario outcome. |
+| `postflight_decision` | The runner independently evaluated final state and trace evidence. |
+| `completion` | The session-end or runner postflight oracle accepted the scenario outcome. |
 
 ## What to show during the classroom demo
 
@@ -287,7 +331,7 @@ Useful trace events include:
 7. Run `unauthorized-rollback` and follow the permission short circuit.
 8. Run `unsafe-rollback` and follow authorization allow → safety block.
 9. Open `runs/run.jsonl` and verify that disabled or skipped work is never described as executed.
-10. End at `pre_verify`: the harness, not the final prose, decides whether the run is complete.
+10. End at the runner postflight: the harness, not the final prose or a zero Hermes return code, decides whether the run is complete.
 
 ## Connection to the exercise
 
@@ -301,7 +345,7 @@ incident-response story. The implementation pattern transfers directly:
 | Permission logic attached to `pre_tool_call` | Apply the supplied default-deny XYZ policy before tools. |
 | Result evidence attached to `post_tool_call` | Let the XYZ policy observe successful `/api-docs` retrieval. |
 | Mutation checks in `pre_tool_call` | Attach the supplied repeated-call hook before execution. |
-| Scenario oracle in `pre_verify` | Attach the supplied behavioral-test completion hook. |
+| Scenario oracle at `on_session_end`, enforced again by runner postflight | The generated-client task edits files, so its supplied `pre_verify` check is reachable; its runner must still enforce the final result at process exit. |
 | `--toolsets`, `--skills`, and `--usage-file` | Invoke the configured Hermes task and preserve run evidence. |
 
 The task-specific policy changes, but the production-harness responsibility is
@@ -317,8 +361,9 @@ python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
 They cover plugin registration, manifest/profile activation, CLI command
-construction, skill preloading evidence, trusted permissions, safe execution,
-permission denial, hook blocking, repeated-call limits, completion nudges,
+construction, skill preloading evidence, trusted permissions, malformed
+identity denial, safe execution, permission denial, hook blocking,
+repeated-call limits, session-end verification, postflight exit enforcement,
 state isolation, and trace contents.
 
 ## Repository map

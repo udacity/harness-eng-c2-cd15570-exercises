@@ -5,6 +5,14 @@
 Confirm that Hermes is installed and has a model and provider configured. Start
 in `module-6-prod-harness/demo`.
 
+When using the course's `gpt-4.1-mini` Vocareum route, configure the source
+Hermes profile before the demo. The runner carries this value into its isolated
+profile:
+
+```bash
+hermes config set model.api_mode chat_completions
+```
+
 Keep these files open in the editor:
 
 1. `README.md`
@@ -25,6 +33,9 @@ hermes config get model --json
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
+Confirm that the model JSON reports `"api_mode": "chat_completions"` before
+making a live call.
+
 Each real scenario resets and overwrites the files under `runs/`. Inspect or
 copy the evidence for one scenario before starting the next scenario.
 
@@ -35,8 +46,8 @@ boundary outcome and authoritative state, not a particular number of calls.
 Do not describe a run as complete merely because Hermes returned exit code
 zero or the final response sounds correct. Require the expected deployment,
 permission or safety decision, tool result, and completion evidence. If the
-summary says `completed false`, present it as an incomplete run and inspect the
-trace instead of talking past it.
+summary says `completed false`, the launcher now exits nonzero; present it as
+an incomplete run and inspect the trace instead of talking past it.
 
 ## 0:00–0:55 — Introduce the production-runtime transition
 
@@ -172,6 +183,12 @@ python3 run_demo.py safe-rollback --dry-run
 - `--toolsets incident-response-demo` exposes the plugin's scoped tools.
 - `--skills` preloads the qualified triage and remediation skills.
 
+> The isolated profile pins `tools.tool_search.enabled` to `"off"`. With only
+> six fixed tools, Hermes can expose their schemas directly instead of asking
+> the model to discover them through bridge calls. The permission and safety
+> hooks still evaluate every proposed incident-tool call, so this changes
+> discovery behavior without weakening the production boundary.
+
 **Say:**
 
 > `run_demo.py` is launch and profile-isolation support, not a second agent
@@ -199,8 +216,18 @@ python3 run_demo.py safe-rollback --dry-run
   safety before execution.
 - `post_tool_call` records the authoritative result and updates fresh-evidence
   state.
-- `pre_verify` checks whether the scenario's required boundary outcome is
-  present when Hermes invokes that completion gate.
+- `on_session_end` always records whether the scenario's required boundary
+  outcome is present when the Hermes conversation ends.
+
+**Show:** `_postflight_decision` and `_effective_exit_code` in `run_demo.py`.
+
+**Say:**
+
+> `on_session_end` is an observer. It records the outcome, but it cannot make
+> the model continue. The launcher therefore repeats the same deterministic
+> oracle after Hermes exits. If Hermes returns zero but the scenario remains
+> incomplete, the launcher returns exit code one. A Hermes process result and
+> a production outcome are related evidence, not the same fact.
 
 **Show:** `before_tool`.
 
@@ -241,17 +268,17 @@ python3 run_demo.py safe-rollback
 > also show an allowed rollback permission decision, an allowed mutation-safety
 > decision, and an executed rollback tool result.
 >
-> `hermes_returncode 0` only says the CLI process exited successfully. It does
-> not independently prove the business outcome. Likewise, `completed true`
-> should correspond to a recorded completion event rather than being inferred
-> from fluent final prose.
+> `hermes_returncode 0` says the CLI process exited successfully.
+> `demo_exit_code 0` says the runner's state-and-trace oracle also accepted the
+> required business outcome. `completed true` should correspond to a recorded
+> completion event rather than being inferred from fluent final prose.
 
 If the summary shows `completed false`, say:
 
-> The requested state change may have occurred, but the run did not record its
-> required completion evidence. I will not label this run complete. The trace
-> will show whether the expected completion lifecycle hook was not invoked or
-> whether its oracle rejected the available evidence.
+> The runner rejected the required production outcome and returned a nonzero
+> status even if Hermes ended normally. I will not label this run complete.
+> The session-end and postflight decisions show which authoritative state or
+> boundary evidence was missing.
 
 ## 6:10–7:00 — Inspect authoritative evidence
 
@@ -276,7 +303,9 @@ sed -n '1,240p' runs/run.jsonl
 > use. `skills_preloaded` proves the CLI selection reached the lifecycle.
 > Permission and hook events record decisions before execution. A `tool_result`
 > proves what the registered handler returned. A `completion` event proves that
-> the scenario oracle accepted the final boundary outcome.
+> the scenario oracle accepted the final boundary outcome. The separate
+> `postflight_decision` proves the launcher checked that outcome before choosing
+> its exit status.
 
 If unknown built-in tools were denied, say:
 

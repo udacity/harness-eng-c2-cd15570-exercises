@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 from typing import Any, Callable, Iterator
+from urllib.parse import urlparse
 
 HERMES_DIR = Path(__file__).resolve().parent
 SOLUTION_DIR = HERMES_DIR.parent
@@ -30,6 +31,9 @@ TEST_RESULT_FILE = RUNS_DIR / "test-results.json"
 SMOKE_FILE = RUNS_DIR / "smoke.json"
 BEHAVIOR_TEST = HERMES_DIR / "tests" / "test_generated_client.py"
 DEFAULT_HERMES_BIN = Path("/Users/peter/.local/bin/hermes")
+VOCAREUM_HOST = "openai.vocareum.com"
+VOCAREUM_MODEL = "gpt-4.1-mini"
+VOCAREUM_API_MODE = "chat_completions"
 
 TASK = """Complete connect_to_xyz_api() in the assigned client file.
 
@@ -82,6 +86,74 @@ def source_hermes_home() -> Path:
     return Path(configured).expanduser().resolve() if configured else Path.home() / ".hermes"
 
 
+def _parse_runtime_command(output: str) -> list[str]:
+    """Validate the launcher's JSON command boundary before executing it."""
+
+    try:
+        command = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Hermes --print-runtime-command did not return valid JSON."
+        ) from exc
+    if (
+        not isinstance(command, list)
+        or not command
+        or any(not isinstance(argument, str) or not argument for argument in command)
+    ):
+        raise RuntimeError(
+            "Hermes --print-runtime-command must return a non-empty JSON array of strings."
+        )
+    return command
+
+
+def hermes_runtime_command(
+    binary: Path,
+    *,
+    module: str,
+    arguments: tuple[str, ...] = (),
+    environment: dict[str, str] | None = None,
+) -> list[str]:
+    """Resolve a module command through the installation's managed runtime."""
+
+    launcher_arguments = [
+        str(binary),
+        "--print-runtime-command",
+        "--module",
+        module,
+    ]
+    if arguments:
+        launcher_arguments.extend(["--", *arguments])
+    completed = subprocess.run(
+        launcher_arguments,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+        env=environment,
+    )
+    if completed.returncode == 0:
+        return _parse_runtime_command(completed.stdout.strip())
+
+    # Hermes 0.21.4 and earlier used this source-install layout and did not
+    # expose --print-runtime-command. Keep those existing course installs
+    # usable while avoiding this path for current managed installations.
+    legacy_root = source_hermes_home() / "hermes-agent" / "venv"
+    legacy_candidates = (
+        legacy_root / "bin" / "python",
+        legacy_root / "Scripts" / "python.exe",
+    )
+    for candidate in legacy_candidates:
+        if candidate.is_file():
+            return [str(candidate), "-m", module, *arguments]
+
+    diagnostic = completed.stderr.strip() or completed.stdout.strip()
+    raise RuntimeError(
+        "Could not resolve the Hermes installation runtime with "
+        "--print-runtime-command. Update Hermes or verify the launcher installation."
+        + (f" Hermes reported: {diagnostic}" if diagnostic else "")
+    )
+
+
 def resolve_model_settings(
     binary: Path, *, model_override: str | None, provider_override: str | None
 ) -> dict[str, str]:
@@ -130,7 +202,31 @@ def resolve_model_settings(
             value = configured.get(key)
             if isinstance(value, str) and value.strip():
                 settings[key] = value.strip()
+    _validate_course_model_route(settings)
     return settings
+
+
+def _validate_course_model_route(settings: dict[str, str]) -> None:
+    """Reject the known-incompatible default wire mode before a provider call."""
+
+    hostname = (urlparse(settings.get("base_url", "")).hostname or "").lower()
+    model = settings.get("model", "").strip().lower().rsplit("/", 1)[-1]
+    is_course_model = model == VOCAREUM_MODEL or model.startswith(
+        f"{VOCAREUM_MODEL}-"
+    )
+    if (
+        hostname == VOCAREUM_HOST
+        and is_course_model
+        and settings.get("api_mode", "").strip().lower() != VOCAREUM_API_MODE
+    ):
+        raise SystemExit(
+            "The Vocareum gpt-4.1-mini route requires Hermes API mode "
+            "chat_completions. Configure the source Hermes profile before "
+            "running the exercise:\n"
+            "  hermes config set model.api_mode chat_completions\n"
+            "Then verify it with:\n"
+            "  hermes config get model --json"
+        )
 
 
 def _yaml_string(value: str) -> str:

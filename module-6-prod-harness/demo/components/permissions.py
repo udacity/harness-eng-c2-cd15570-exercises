@@ -67,7 +67,12 @@ def decide(
         return PermissionDecision(False, None, "default_deny", "Unknown tool.")
     role = user.get("role")
     user_id = user.get("user_id")
-    if role not in ROLE_PERMISSIONS or not user_id:
+    if (
+        not isinstance(role, str)
+        or role not in ROLE_PERMISSIONS
+        or not isinstance(user_id, str)
+        or not user_id.strip()
+    ):
         return PermissionDecision(
             False, ordinary, "identity.invalid", "Trusted identity is invalid."
         )
