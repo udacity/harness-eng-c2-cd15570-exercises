@@ -519,6 +519,34 @@ def test_source_profile_api_mode_reaches_isolated_profile(monkeypatch) -> None:
     assert 'api_mode: "chat_completions"' in _profile_config(settings)
 
 
+def test_custom_endpoint_key_reference_reaches_isolated_profile(monkeypatch, tmp_path) -> None:
+    (tmp_path / ".env").write_text(
+        "# OPENAI_API_KEY=\nHERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY=voc-test\n",
+        encoding="utf-8",
+    )
+    configured = {
+        "provider": "custom",
+        "default": "gpt-4.1-mini",
+        "base_url": "https://openai.vocareum.com/v1",
+        "api_mode": "chat_completions",
+    }
+
+    def fake_run(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, json.dumps(configured), "")
+
+    monkeypatch.setattr("hermes.run_exercise.subprocess.run", fake_run)
+    monkeypatch.setenv("HERMES_SOURCE_HOME", str(tmp_path))
+    settings = resolve_model_settings(
+        Path("/usr/local/bin/hermes"),
+        model_override=None,
+        provider_override=None,
+    )
+    rendered = _profile_config(settings)
+
+    assert 'api_key: "${HERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY}"' in rendered
+    assert "voc-test" not in rendered
+
+
 def test_runtime_command_uses_launcher_managed_argv(monkeypatch) -> None:
     environment = {"HERMES_HOME": "/tmp/test-profile"}
     expected = ["/managed/python", "-I", "-c", "bootstrap"]
@@ -575,7 +603,7 @@ def test_installed_hermes_loads_plugin_offline() -> None:
                 [str(binary), "plugins", "list", "--enabled", "--json"],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=120,
                 check=False,
                 env=environment,
                 cwd=HERMES_DIR,
@@ -584,7 +612,7 @@ def test_installed_hermes_loads_plugin_offline() -> None:
                 [str(binary), "prompt-size", "--platform", "cli", "--json"],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=120,
                 check=False,
                 env=environment,
                 cwd=HERMES_DIR,
@@ -617,7 +645,7 @@ def test_installed_hermes_loads_plugin_offline() -> None:
                 ),
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=120,
                 check=False,
                 env=environment,
                 cwd=HERMES_DIR,

@@ -172,8 +172,10 @@ def create_return(arguments: dict, store: dict) -> dict:
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("reason must be a nonempty string when supplied.")
     serial_number = arguments.get("serial_number")
-    if serial_number is not None and (not isinstance(serial_number, str) or not serial_number.strip()):
-        raise ValueError("serial_number must be a nonempty string when supplied.")
+    if isinstance(serial_number, str) and not serial_number.strip():
+        serial_number = None
+    if serial_number is not None and not isinstance(serial_number, str):
+        raise ValueError("serial_number must be a string when supplied.")
 
     number = store["next_return_number"]
     return_id = f"RET-{number}"

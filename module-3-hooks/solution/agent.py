@@ -183,6 +183,16 @@ def _tool_result(item: Any, mode: str, source_report: dict) -> tuple[dict, dict]
     return event, tool_output
 
 
+def count_failed_rules(events: list[dict]) -> int:
+    """Count distinct failed policy checks across all hooked submissions."""
+    failed_rules = {
+        name for event in events for name, passed in event["checks"].items() if not passed
+    }
+    if failed_rules:
+        return len(failed_rules)
+    return len([violation for event in events for violation in event["violations"]])
+
+
 def run_agent(client: Any, model: str, report: dict, mode: str) -> dict:
     """Call the model, handle proposed tools, and pause after every cycle."""
     if mode not in ("basic", "hooks"):
@@ -246,9 +256,6 @@ def run_agent(client: Any, model: str, report: dict, mode: str) -> dict:
     submission_executed = any(event["submission_executed"] for event in events)
     blocked = any(event["status"] == "blocked" for event in events)
     tool_error = any(event["status"] == "tool_error" for event in events)
-    failed_rules = {
-        name for event in events for name, passed in event["checks"].items() if not passed
-    }
     if submission_executed:
         status = "submitted"
     elif blocked:
@@ -264,8 +271,10 @@ def run_agent(client: Any, model: str, report: dict, mode: str) -> dict:
         "tool_requested": ", ".join(event["tool"] for event in events) or "none",
         "hook_executed": any(event["hook_executed"] for event in events),
         "violations_detected": (
-            len(failed_rules) if failed_rules else len([v for event in events for v in event["violations"]])
-        ) if mode == "hooks" and any(event["hook_executed"] for event in events) else None,
+            count_failed_rules(events)
+            if mode == "hooks" and any(event["hook_executed"] for event in events)
+            else None
+        ),
         "tool_executed": tool_executed,
         "report_retrieved": any(event["status"] == "retrieved" for event in events),
         "items_inspected": len({

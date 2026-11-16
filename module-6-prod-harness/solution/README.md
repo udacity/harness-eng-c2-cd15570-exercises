@@ -26,6 +26,12 @@ Vocareum using `chat_completions`. That API mode prevents Hermes from sending
 the unsupported `reasoning.effort` field. Confirm that the displayed model
 configuration contains `"api_mode": "chat_completions"`.
 
+In `hermes setup`, choose **Custom endpoint (enter URL manually)** and enter
+the base URL `https://openai.vocareum.com/v1`, your Vocareum API key,
+API mode **Chat Completions**, and the model `gpt-4.1-mini`. This saves the key
+as `HERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY`, which the runner passes to its
+isolated profile.
+
 ## Exercise at a glance
 
 A complete local XYZ API server is supplied and ready to receive data. The missing piece is a Python client function that sends data to its synchronization endpoint. Before writing that function, the agent in each harness must call the API's documentation endpoint to learn the contract.
@@ -421,7 +427,7 @@ runner copies that API mode into its isolated temporary profile and stops with
 an actionable error before a provider call if the Vocareum route is
 misconfigured.
 
-The Hermes runner defaults to `/Users/XXXX/.local/bin/hermes`. If Hermes is
+The Hermes runner defaults to `$HOME/.local/bin/hermes`. If Hermes is
 installed elsewhere, point the runner to it before continuing:
 
 ```bash
@@ -603,7 +609,7 @@ or create Task 5 evidence. The test sends its prompt, supplied skill, tool
 requests and results, and temporary client context to the provider configured
 by `OPENAI_BASE_URL`.
 
-Task 3 is complete when all six tests pass and the probe client remains
+Task 3 is complete when all seven tests pass and the probe client remains
 incomplete. Do not run `python3 python/run_exercise.py --fresh` yet; that command
 implements the client and belongs to Task 5.
 
@@ -750,7 +756,7 @@ The probe uses a temporary Hermes profile and workspace. It must leave
 skill, tool requests and results, and temporary client context to the provider
 configured in the active Hermes profile.
 
-Task 4 is complete when pytest reports `11 passed`, the probe summary reports a
+Task 4 is complete when pytest reports `17 passed`, the probe summary reports a
 zero Hermes return code, and the temporary client still contains
 `NotImplementedError`. Do not run
 `python3 hermes/run_exercise.py --fresh` yet; that command implements the client
