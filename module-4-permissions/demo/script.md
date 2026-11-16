@@ -140,8 +140,8 @@ press Return. Do not spend time narrating every read.
 **Say when rollback is proposed:**
 
 > The rollback proposal also skips authorization. The Module 3 safety hook
-> still runs. After the required health evidence has been collected, it
-> verifies that `checkout-v41` is the last-known-good target. Because the
+> still runs. The prompt asked the model to read health and deployment history
+> first, and the hook confirms that health read happened. It then verifies that `checkout-v41` is the last-known-good target. Because the
 > change is safe for the current incident state, the hook allows it and `TOOL
 > EXECUTED: YES` changes the deployment.
 >

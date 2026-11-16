@@ -34,6 +34,12 @@ it executes because authorization is absent. In `permissions`, evidence reads
 are allowed because Sam owns the assignment, but the rollback is denied because
 the role lacks `deployment.rollback`.
 
+The prompt tells the model to read service health and deployment history before
+each mutation request, and to read health again after a mutation executes. The
+Module 3 hook still checks for that evidence itself. The instruction only stops
+a skipped read from blocking the safe rollback in `basic`, which would hide the
+contrast.
+
 This isolates the new lesson: a safe action can still be unauthorized.
 
 ## Authentication and authorization
