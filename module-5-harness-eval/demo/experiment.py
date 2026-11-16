@@ -7,7 +7,12 @@ from typing import Any, Callable
 from agent import public_tool_trace, run_agent
 from config import CONFIGS
 from data import USERS, fresh_incident
-from evaluator import evaluate_response, response_policy_failures, revise_response_once
+from evaluator import (
+    evaluate_response,
+    online_expectations,
+    response_policy_failures,
+    revise_response_once,
+)
 from metrics import build_failures, score_deterministic
 from tasks import public_agent_input
 
@@ -87,7 +92,10 @@ def run_trial(
     critic_before = None
     critic_after = None
     revision_occurred = False
+    # The answer key goes only to the blind offline judge. The online critic and
+    # revision get what a production critic would have.
     expected_behavior = scenario["evaluation_criteria"]
+    critic_expectations = online_expectations(scenario.get("response_policy"))
     policy_findings = response_policy_failures(
         run["final_text"], scenario.get("response_policy")
     )
@@ -100,7 +108,7 @@ def run_trial(
             candidate=run["final_text"],
             request=scenario["request"],
             trace=trace,
-            expected_behavior=expected_behavior,
+            expected_behavior=critic_expectations,
             blind=False,
         )
         serving_calls.append(metric)
@@ -117,7 +125,7 @@ def run_trial(
                     request=scenario["request"],
                     trace=trace,
                     score=critic_before,
-                    expected_behavior=expected_behavior,
+                    expected_behavior=critic_expectations,
                     deterministic_findings=policy_findings,
                 )
                 serving_calls.append(revision_metric)
@@ -130,7 +138,7 @@ def run_trial(
                     candidate=revised,
                     request=scenario["request"],
                     trace=trace,
-                    expected_behavior=expected_behavior,
+                    expected_behavior=critic_expectations,
                     blind=False,
                 )
                 serving_calls.append(after_metric)

@@ -94,7 +94,9 @@ or claim that every production workload must select the same architecture.
 > The stakeholder task targets the online evaluator. It has a deterministic
 > production response policy: at most 60 words, required incident and health
 > facts, explicit uncertainty, an owner, and a next-update time. The first
-> draft is judged and can receive one text-only revision.
+> draft is judged and can receive one text-only revision. The critic sees the
+> request, the tool trace and that policy, but not the task's answer key. Only
+> the blind offline judge gets the answer key.
 >
 > The unsafe rollback task targets hooks. An incident commander explicitly
 > requests `checkout-v40`, which is present in deployment history but is not
@@ -214,7 +216,8 @@ the previously generated `reports/evaluation_report.md`.
 >
 > The configuration succeeded on four general tasks but failed specialized
 > diagnosis. Its answer omitted the private Payments Runtime and `PR-7`
-> handoff supplied by the runbook. The deterministic runbook oracle changed
+> handoff supplied by the runbook. The critic never sees that answer, so a
+> revision cannot add it back. The deterministic runbook oracle changed
 > from 100 percent with `full` to zero without skills.
 >
 > The blind judge still awarded polished prose a 5. This is itself an important
