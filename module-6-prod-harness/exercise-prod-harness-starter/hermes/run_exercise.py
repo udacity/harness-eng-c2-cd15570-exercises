@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -202,8 +203,32 @@ def resolve_model_settings(
             value = configured.get(key)
             if isinstance(value, str) and value.strip():
                 settings[key] = value.strip()
+        key_env = _custom_endpoint_key_env(settings.get("base_url", ""))
+        if key_env:
+            settings["api_key_env"] = key_env
     _validate_course_model_route(settings)
     return settings
+
+
+def _custom_endpoint_key_env(base_url: str) -> str | None:
+    """Name (never the value) of the key `hermes setup` saved for a custom endpoint.
+
+    The isolated profile has no custom-provider entry, so it must reference this
+    variable explicitly or the endpoint is called without its key.
+    """
+
+    host = (urlparse(base_url).hostname or "").upper()
+    if not host:
+        return None
+    candidate = "HERMES_CUSTOM_" + re.sub(r"[^A-Z0-9]+", "_", host).strip("_") + "_API_KEY"
+    env_file = source_hermes_home() / ".env"
+    if not env_file.is_file():
+        return None
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        name, separator, _ = line.partition("=")
+        if separator and name.strip() == candidate:
+            return candidate
+    return None
 
 
 def _validate_course_model_route(settings: dict[str, str]) -> None:
@@ -243,6 +268,8 @@ def _profile_config(model: dict[str, str]) -> str:
         lines.append(f"  base_url: {_yaml_string(model['base_url'])}")
     if model.get("api_mode"):
         lines.append(f"  api_mode: {_yaml_string(model['api_mode'])}")
+    if model.get("api_key_env"):
+        lines.append(f"  api_key: {_yaml_string('${' + model['api_key_env'] + '}')}")
     return "\n".join(lines) + "\n"
 
 
@@ -277,7 +304,9 @@ def temporary_profile(
 ) -> Iterator[tuple[Path, dict[str, str], Path]]:
     """Create an isolated Hermes profile without persisting copied credentials."""
 
-    with tempfile.TemporaryDirectory(prefix="xyz-hermes-profile-") as temp_dir:
+    with tempfile.TemporaryDirectory(
+        prefix="xyz-hermes-profile-", ignore_cleanup_errors=True
+    ) as temp_dir:
         profile = Path(temp_dir) / "profile"
         plugin_target = profile / "plugins" / "xyz-api-harness"
         plugin_target.parent.mkdir(parents=True, exist_ok=True)

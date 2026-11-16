@@ -213,6 +213,17 @@ class DeterministicBoundaryTests(unittest.TestCase):
         self.assertEqual(result["refund_amount_cents"], 30000)
         self.assertTrue(self.store["orders"]["ORD-1004"]["refund_issued"])
 
+    def test_blank_serial_number_is_treated_as_not_supplied(self) -> None:
+        result = execute_tool(
+            "create_return",
+            {"order_id": "ORD-1002", "sku": "SHIRT-01", "quantity": 1, "serial_number": "  "},
+            self.store,
+        )
+
+        self.assertNotIn("error", result)
+        record = next(iter(self.store["returns"].values()))
+        self.assertNotIn("serial_number", record)
+
     def test_bare_configuration_observes_but_does_not_enforce_boundaries(self) -> None:
         item = function_call(
             "issue_refund", {"order_id": "ORD-1004", "refund_amount": 300}, "bare"
