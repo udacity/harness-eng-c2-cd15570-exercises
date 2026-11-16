@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -25,7 +26,7 @@ STATE_FILE = RUNS_DIR / "incident.json"
 TRACE_FILE = RUNS_DIR / "run.jsonl"
 USAGE_FILE = RUNS_DIR / "usage.json"
 RESULT_FILE = RUNS_DIR / "run-result.json"
-DEFAULT_HERMES_BIN = Path("/Users/peter/.local/bin/hermes")
+DEFAULT_HERMES_BIN = Path.home() / ".local" / "bin" / "hermes"
 VOCAREUM_HOST = "openai.vocareum.com"
 VOCAREUM_MODEL = "gpt-4.1-mini"
 VOCAREUM_API_MODE = "chat_completions"
@@ -108,8 +109,32 @@ def resolve_model(
         for key in ("base_url", "api_mode"):
             if isinstance(configured.get(key), str) and configured[key].strip():
                 resolved[key] = configured[key].strip()
+        key_env = _custom_endpoint_key_env(resolved.get("base_url", ""))
+        if key_env:
+            resolved["api_key_env"] = key_env
     _validate_course_model_route(resolved)
     return resolved
+
+
+def _custom_endpoint_key_env(base_url: str) -> str | None:
+    """Name (never the value) of the key `hermes setup` saved for a custom endpoint.
+
+    The isolated profile has no custom-provider entry, so it must reference this
+    variable explicitly or the endpoint is called without its key.
+    """
+
+    host = (urlparse(base_url).hostname or "").upper()
+    if not host:
+        return None
+    candidate = "HERMES_CUSTOM_" + re.sub(r"[^A-Z0-9]+", "_", host).strip("_") + "_API_KEY"
+    env_file = source_hermes_home() / ".env"
+    if not env_file.is_file():
+        return None
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        name, separator, _ = line.partition("=")
+        if separator and name.strip() == candidate:
+            return candidate
+    return None
 
 
 def _validate_course_model_route(settings: dict[str, str]) -> None:
@@ -148,6 +173,8 @@ def _profile_config(model: dict[str, str]) -> str:
         lines.append(f"  base_url: {json.dumps(model['base_url'])}")
     if model.get("api_mode"):
         lines.append(f"  api_mode: {json.dumps(model['api_mode'])}")
+    if model.get("api_key_env"):
+        lines.append(f"  api_key: {json.dumps('${' + model['api_key_env'] + '}')}")
     return "\n".join(lines) + "\n"
 
 
@@ -169,7 +196,9 @@ def _copy_credentials(source: Path, destination: Path) -> None:
 
 @contextmanager
 def temporary_profile(model: dict[str, str]) -> Iterator[tuple[Path, dict[str, str]]]:
-    with tempfile.TemporaryDirectory(prefix="incident-hermes-profile-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="incident-hermes-profile-", ignore_cleanup_errors=True
+    ) as directory:
         profile = Path(directory) / "profile"
         plugin_target = profile / "plugins" / "incident-response-demo"
         plugin_target.parent.mkdir(parents=True)

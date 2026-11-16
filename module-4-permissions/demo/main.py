@@ -249,7 +249,7 @@ def _authorization_effect(
             ("assignee", "assigned_user_id"),
         ):
             if before[key] != after[key]:
-                changed.append(f"{label} {before[key]} -> {after[key]}")
+                changed.append(f"{label} {after[key]} (basic: {before[key]})")
         if changed:
             effects.append("; ".join(changed))
     return "; ".join(effects) or "no business tool call was proposed"
@@ -314,7 +314,7 @@ def run_demo(args: argparse.Namespace) -> None:
     print("============================================================")
     print(f"Model: {MODEL} | Endpoint: {BASE_URL}")
     print(f"Skills available: {', '.join(catalog)}")
-    print("\nBoth modes retain Module 3 safety hooks; only authorization changes.")
+    print("\nBoth modes retain the deterministic safety hooks; only authorization changes.")
 
     rows: list[dict[str, Any]] = []
     scenario_count = len(scenario_paths)

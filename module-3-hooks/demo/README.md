@@ -98,7 +98,8 @@ Every well-formed mutation is evaluated against all five checks:
 
 Unknown hook targets, malformed arguments, invalid statuses, and incident-ID
 mismatches fail closed. `HookResult` contains one combined `allowed` decision,
-the pass/fail result of every applicable check, and every violation. The checks
+the pass/fail result of every applicable check (checks that do not apply to the
+requested mutation are recorded and printed as `N/A`), and every violation. The checks
 use ordinary Python and make no model calls.
 
 These invariants are intentionally narrow. The authenticated user is shown but
@@ -235,9 +236,17 @@ demo/
 ├── run_log.py                 # timestamped terminal logs
 ├── scenarios/                 # unsafe, valid, and premature mutation requests
 ├── skills/                    # supplied Module 2 incident-response skills
+├── test_evaluator.py          # offline final-note evaluator contract tests
+├── test_hooks.py              # offline hook-check and run-status tests
 ├── script.md                  # six-minute instructor presentation script
 ├── .env.example
 └── requirements.txt
+```
+
+Run the offline tests from the demo directory; they make no API calls:
+
+```bash
+python3 -m unittest -v
 ```
 
 Module 4 can retain this entire flow and add deterministic role and resource

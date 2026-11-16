@@ -66,6 +66,7 @@ Install the dependencies and create a local environment file:
 ```bash
 cd module-1-evaluator/demo
 python3 -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
 Add your course API key to `.env`, then run:
@@ -120,15 +121,19 @@ and criterion comparison rather than hiding them behind one score.
 ## Conversation boundaries
 
 The loops call `client.responses.create(...)` directly, just as the exercise
-does. The terminal prints the exact continuation rule at every stage:
+does. The terminal prints the continuation rule at every stage, with the live
+response IDs in place of the angle-bracket placeholders:
 
 ```text
-Initial generation: no previous_response_id
-Self-review:        previous_response_id=candidate.id
-Self revision:      previous_response_id=self_review.id
-External review:    no previous_response_id
-External revision:  previous_response_id=candidate.id
+Initial generation: previous_response_id=NONE
+Clarifying revision: previous_response_id=<first response id>
+Self-review call: previous_response_id=<candidate id>
+Self revision call: previous_response_id=<self-review id>
+External review call: previous_response_id=NONE (fresh conversation)
+External revision call: previous_response_id=<candidate id>
 ```
+
+`Clarifying revision` appears only in `basic` mode.
 
 The self revision continues through the review because that review belongs to
 the generator conversation. The independent evaluator starts fresh so it does
@@ -187,8 +192,15 @@ demo/
 │   └── scenario.py            # scenario loading and prompt context
 ├── scenarios/
 │   └── inc_2048.json          # shared incident facts and requirements
+├── test_evaluator_contract.py # offline checks for the evaluator contract
 ├── .env.example
 └── requirements.txt
+```
+
+Run the offline tests from the demo directory; they make no API calls:
+
+```bash
+python3 -m unittest -v
 ```
 
 Module 2 will keep the same incident and evaluator boundary while adding

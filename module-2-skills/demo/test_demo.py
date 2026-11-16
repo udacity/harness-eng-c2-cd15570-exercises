@@ -110,6 +110,22 @@ class SkillResolutionTests(DemoTestCase):
             self.assertEqual(record["chars"], 0)
             self.assertTrue(output["output"].startswith("ERROR:"))
 
+    def test_extra_arguments_are_rejected_without_loading(self) -> None:
+        item = SimpleNamespace(
+            name="load_skill",
+            arguments=json.dumps(
+                {"skill_name": "incident_triage", "path": "../secret"}
+            ),
+            call_id="call-4",
+        )
+        record, output = resolve_skill_call(item, self.catalog)
+        self.assertFalse(record["loaded"])
+        self.assertIsNone(record["path"])
+        self.assertEqual(record["chars"], 0)
+        self.assertEqual(
+            output["output"], "ERROR: arguments must contain only skill_name"
+        )
+
 
 class AgentLoopTests(DemoTestCase):
     def test_basic_sends_every_complete_skill_in_one_cycle(self) -> None:
@@ -166,6 +182,27 @@ class AgentLoopTests(DemoTestCase):
         self.assertEqual(result["status"], "complete")
         self.assertEqual(result["loaded_skills"], [])
         self.assertEqual(len(client.responses.calls), 2)
+
+    def test_skill_loaded_twice_is_counted_once(self) -> None:
+        request = self.request("checkout_diagnosis")
+        brief = build_brief(self.incident, request)
+        once = run_with_skills(
+            ScriptedClient(forced_skills=["incident_triage"]),
+            MODEL,
+            brief,
+            self.catalog,
+            emit=lambda _: None,
+        )
+        twice = run_with_skills(
+            ScriptedClient(forced_skills=["incident_triage", "incident_triage"]),
+            MODEL,
+            brief,
+            self.catalog,
+            emit=lambda _: None,
+        )
+        self.assertEqual(len(twice["skill_calls"]), 2)
+        self.assertEqual(twice["loaded_skills"], ["incident_triage"])
+        self.assertEqual(twice["full_skill_chars"], once["full_skill_chars"])
 
     def test_supplied_evaluator_is_fresh_and_separate_from_serving_metrics(self) -> None:
         request = self.request("checkout_diagnosis")

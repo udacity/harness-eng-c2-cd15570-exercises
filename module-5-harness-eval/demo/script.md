@@ -154,14 +154,16 @@ evaluator    checks and improves the response after tool execution
 
 **Show:** the terminal in `module-5-harness-eval/demo`.
 
-For a live run, use:
+For a live run, write to a separate folder so the live run does not overwrite
+the prepared `reports/` after every trial:
 
 ```bash
-python3 main.py compare --scenario all
+python3 main.py compare --scenario all --output-dir reports/live
 ```
 
-The demo pauses after generator cycles by default. For a pre-recorded or
-unattended run, use `--no-pause`.
+The live report is then `reports/live/evaluation_report.md`. The demo pauses
+after generator cycles by default. For a pre-recorded or unattended run, use
+`--no-pause`.
 
 **Say when the study header appears:**
 
@@ -261,7 +263,8 @@ the previously generated `reports/evaluation_report.md`.
 > In `full`, the deterministic hook recognized that `checkout-v40` was not
 > last-known-good and blocked the proposal before the rollback tool executed.
 > With hooks removed, the permissive tool changed production to the invalid
-> version. The target-task quality then fell to 2.80.
+> version. The Hooks target-task row shows success falling from 100 to 0
+> percent and invalid executions rising from 0 to 1.
 >
 > This demonstrates prevention rather than advice. The model had guidance and
 > an evaluator in both configurations. Those components did not provide the
@@ -284,7 +287,8 @@ the previously generated `reports/evaluation_report.md`.
 >
 > With permissions enabled, authorization denies the call before the hook or
 > business tool runs. With permissions removed, the safe target executes for
-> an unauthorized user, and target-task quality falls to 2.80.
+> an unauthorized user. The Permissions target-task row shows success falling
+> from 100 to 0 percent and unauthorized executions rising from 0 to 1.
 >
 > Safety and authority are independent. Hooks answer, “Is this mutation valid
 > for the current system state?” Permissions answer, “May this authenticated
