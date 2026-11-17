@@ -227,6 +227,34 @@ class ComponentEffectTests(DemoTestCase):
             self.runs[("no-evaluator", "stakeholder_update")]["final_incident"],
         )
 
+    def test_answer_key_reaches_only_the_blind_judge(self) -> None:
+        scenario = load_scenario("specialized_diagnosis")
+        client = ScriptedClient(scenario, CONFIGS["no-skills"])
+        run_trial(
+            client,
+            MODEL,
+            config_name="no-skills",
+            scenario=scenario,
+            trial_number=1,
+            catalog=self.catalog,
+            emit=lambda _message: None,
+        )
+        by_role: dict[str, list[str]] = {"critic": [], "revision": [], "judge": []}
+        for call in client.responses.calls:
+            instructions = str(call.get("instructions", ""))
+            if "online incident-response critic" in instructions:
+                by_role["critic"].append(str(call["input"]))
+            elif "revise an incident-response response" in instructions:
+                by_role["revision"].append(str(call["input"]))
+            elif "blind offline incident-response judge" in instructions:
+                by_role["judge"].append(str(call["input"]))
+        self.assertTrue(by_role["critic"])
+        self.assertTrue(by_role["revision"])
+        for text in by_role["critic"] + by_role["revision"]:
+            self.assertNotIn("Payments Runtime", text)
+            self.assertNotIn("PR-7", text)
+        self.assertIn("Payments Runtime", by_role["judge"][0])
+
     def test_benchmark_cost_is_not_counted_as_serving_cost(self) -> None:
         row = self.row("full", "routine_triage")
         serving_from_calls = sum(

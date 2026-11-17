@@ -243,6 +243,13 @@ reverse a side effect. It receives the production response policy, and a
 revision occurs when the critic score is below 4.8 or deterministic policy
 checks find a missing required field.
 
+The critic and the revision see only what a production critic would have: the
+request, the tool trace, a generic grounding rubric (`ONLINE_EXPECTATIONS` in
+`evaluator.py`), and the response policy when the task has one. Each scenario's
+`evaluation_criteria` is the answer key, for example the Payments Runtime owner
+and playbook `PR-7`. It goes only to the blind offline judge, so revision
+cannot add back knowledge that a removed skill would have supplied.
+
 The blind judge scores every final response after serving completes. It never
 changes the response or executes a tool. Its tokens and model time are stored
 as benchmark overhead and excluded from the minimum-harness cost ranking.
@@ -311,11 +318,12 @@ analysis on its own artifacts.
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-The 23 tests need no API key. They cover the exact configuration matrix,
+The 24 tests need no API key. They cover the exact configuration matrix,
 single-variable ablations, task scope, pristine trial state, permissive tools,
 permission and hook enforcement, malformed identities, shadow observation,
 skill effects, text-only revision, strict response policy, typed trial-key and
-target-probe coverage, blind-trace isolation, separate judge selection, cost
+target-probe coverage, blind-trace isolation, answer-key isolation from the
+online critic, separate judge selection, cost
 separation, aggregation, qualification, study readiness, and artifact
 generation.
 
