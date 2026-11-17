@@ -137,6 +137,29 @@ def _hook_decision(run: dict[str, Any] | None) -> str:
     return "; ".join(decisions) or "NO MUTATION DECISION"
 
 
+BLOCK_REASONS = {
+    "fresh_health_evidence": "no fresh health check",
+    "rollback_target_exists": "an unknown rollback target",
+    "rollback_target_last_known_good": "a non-last-known-good target",
+    "mutation_not_repeated": "a repeated mutation",
+    "resolution_state_valid": "a premature resolution",
+}
+
+
+def _block_reasons(run: dict[str, Any]) -> str:
+    """Name the failed checks behind blocked calls, in check order."""
+
+    failed = {
+        name
+        for event in run["events"]
+        if event["status"] == "blocked"
+        for name, passed in event["checks"].items()
+        if passed is False
+    }
+    reasons = [label for name, label in BLOCK_REASONS.items() if name in failed]
+    return " and ".join(reasons) or "a fail-closed violation"
+
+
 def _hook_benefit(
     basic: dict[str, Any] | None, hooks: dict[str, Any] | None
 ) -> str:
@@ -180,10 +203,11 @@ def _hook_benefit(
 
     if hooks["mutations_executed"] and blocked:
         benefits.append(
-            "allowed the checked change and blocked an unsafe/repeated request"
+            "allowed the checked change and blocked a request with "
+            + _block_reasons(hooks)
         )
     elif not benefits and blocked:
-        benefits.append("prevented an unsafe/repeated request")
+        benefits.append("blocked a request with " + _block_reasons(hooks))
     elif not blocked and hooks["mutations_executed"]:
         benefits.append("allowed the change after its checks passed")
     elif not benefits:
@@ -201,15 +225,21 @@ def print_comparison(rows: list[dict[str, Any]]) -> None:
         run = row["run"]
         grouped.setdefault(run["scenario_id"], {})[run["mode"]] = run
 
+    decisions = {
+        scenario_id: _hook_decision(runs.get("hooks"))
+        for scenario_id, runs in grouped.items()
+    }
+    decision_width = max([51, *(len(value) + 1 for value in decisions.values())])
+
     print("\n================ WHY HOOKS ARE SAFER ================")
     print(
         "Scenario             | Basic final (unchecked)      | "
-        "Hooks final (checked)        | Hook decision                                      | "
+        f"Hooks final (checked)        | {'Hook decision':<{decision_width}}| "
         "Safety benefit"
     )
     print(
         "---------------------+------------------------------+"
-        "------------------------------+----------------------------------------------------+"
+        f"------------------------------+{'-' * (decision_width + 1)}+"
         "---------------------------------------------------------"
     )
     for scenario_id, runs in grouped.items():
@@ -219,7 +249,7 @@ def print_comparison(rows: list[dict[str, Any]]) -> None:
             f"{scenario_id:<21}| "
             f"{_final_state(basic):<29}| "
             f"{_final_state(hooks):<29}| "
-            f"{_hook_decision(hooks):<51}| "
+            f"{decisions[scenario_id]:<{decision_width}}| "
             f"{_hook_benefit(basic, hooks)}"
         )
     print(
@@ -244,7 +274,7 @@ def run_demo(args: argparse.Namespace) -> None:
     print("============================================================")
     print(f"Model: {MODEL} | Endpoint: {BASE_URL}")
     print(f"Skills available: {', '.join(catalog)}")
-    print("Permissions are displayed but intentionally not enforced until Module 4.")
+    print("Permissions are displayed but intentionally not enforced in this demo.")
 
     rows: list[dict[str, Any]] = []
     for path in scenario_paths:

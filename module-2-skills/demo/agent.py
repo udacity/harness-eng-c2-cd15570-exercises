@@ -210,7 +210,10 @@ def run_with_skills(
 
     if not tool_outputs:
         emit("No skill was requested in the selection cycle.")
-    full_skill_chars = sum(call["chars"] for call in skill_calls if call["loaded"])
+    loaded_chars = {
+        call["skill"]: call["chars"] for call in skill_calls if call["loaded"]
+    }
+    full_skill_chars = sum(loaded_chars.values())
     emit(f"Full skill text supplied through tool results: {full_skill_chars} characters.")
     pause()
 

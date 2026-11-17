@@ -215,7 +215,8 @@ def handle_tool_call(
         event["checks"] = hook.checks
         event["violations"] = list(hook.violations)
         for check_name, passed in hook.checks.items():
-            emit(f"CHECK: {check_name}: {'PASS' if passed else 'FAIL'}")
+            label = "N/A" if passed is None else "PASS" if passed else "FAIL"
+            emit(f"CHECK: {check_name}: {label}")
         if not hook.allowed:
             event["result_status"] = "blocked"
             emit("SAFETY RESULT: BLOCKED")

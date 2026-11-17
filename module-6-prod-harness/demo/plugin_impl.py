@@ -193,7 +193,10 @@ class IncidentResponsePlugin:
                 tool_name, arguments, self.incident, self.evidence
             )
             self.trace.record(
-                "hook_decision", tool=tool_name, **safety.to_dict()
+                "hook_decision",
+                tool=tool_name,
+                arguments=arguments,
+                **safety.to_dict(),
             )
             if not safety.allowed:
                 return {

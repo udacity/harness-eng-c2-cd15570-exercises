@@ -288,7 +288,8 @@ def _tool_result(
         event["checks"] = decision.checks
         event["violations"] = list(decision.violations)
         for check_name, passed in decision.checks.items():
-            emit(f"CHECK: {check_name}: {'PASS' if passed else 'FAIL'}")
+            label = "N/A" if passed is None else "PASS" if passed else "FAIL"
+            emit(f"CHECK: {check_name}: {label}")
         if not decision.allowed:
             event["status"] = "blocked"
             emit("HOOK RESULT: BLOCKED")
@@ -329,7 +330,7 @@ def count_failed_rules(events: list[dict[str, Any]]) -> int:
         name
         for event in events
         for name, passed in event["checks"].items()
-        if not passed
+        if passed is False
     }
     if failed:
         return len(failed)
@@ -432,7 +433,9 @@ def run_agent(
     executed = any(event["mutation_executed"] for event in mutation_events)
     tool_error = any(event["status"] == "tool_error" for event in events)
     status = (
-        "blocked"
+        "mutated_and_blocked"
+        if blocked and executed
+        else "blocked"
         if blocked
         else "mutated"
         if executed

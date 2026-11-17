@@ -1,9 +1,12 @@
 """Deterministic tests for the Hermes CLI incident-response demo."""
 
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from components.hooks import CompletionHook, RepeatedCallHook, SafetyHook
 from components.permissions import decide
@@ -15,6 +18,7 @@ from run_demo import (
     _profile_config,
     _validate_course_model_route,
     build_command,
+    resolve_model,
 )
 
 
@@ -66,6 +70,31 @@ class DemoTestCase(unittest.TestCase):
         result = context.tools[name]["handler"](arguments)
         plugin.after_tool(name, arguments, result)
         return json.loads(result)
+
+    def completion_decision(self, plugin) -> dict:
+        plugin.after_session()
+        decisions = [
+            event
+            for event in plugin.trace.events
+            if event.get("hook") == "completion_verification"
+        ]
+        self.assertEqual(len(decisions), 1)
+        return decisions[0]
+
+    def assert_scenario_completed(self, plugin) -> None:
+        decision = self.completion_decision(plugin)
+        self.assertTrue(decision["allowed"], decision["reason"])
+        self.assertTrue(
+            any(event.get("event") == "completion" for event in plugin.trace.events)
+        )
+
+    def assert_scenario_incomplete(self, plugin) -> None:
+        decision = self.completion_decision(plugin)
+        self.assertFalse(decision["allowed"])
+        self.assertIn("scenario_incomplete", decision["codes"])
+        self.assertFalse(
+            any(event.get("event") == "completion" for event in plugin.trace.events)
+        )
 
 
 class RegistrationTests(DemoTestCase):
@@ -171,7 +200,7 @@ class BoundaryTests(DemoTestCase):
             json.loads(state_path.read_text(encoding="utf-8"))["current_deployment"],
             "checkout-v41",
         )
-        self.assertIsNone(plugin.after_session())
+        self.assert_scenario_completed(plugin)
 
     def test_support_engineer_rollback_is_denied_before_execution(self) -> None:
         plugin, context, state_path, _ = self.make_plugin("unauthorized-rollback")
@@ -193,7 +222,21 @@ class BoundaryTests(DemoTestCase):
             json.loads(state_path.read_text(encoding="utf-8"))["current_deployment"],
             "checkout-v42",
         )
-        self.assertIsNone(plugin.after_session())
+        self.assert_scenario_completed(plugin)
+
+    def test_denial_for_wrong_incident_does_not_complete_unauthorized_case(
+        self,
+    ) -> None:
+        plugin, context, _, _ = self.make_plugin("unauthorized-rollback")
+        result = self.call(
+            plugin,
+            context,
+            "rollback_deployment",
+            {"incident_id": "INC-9999", "target_version": "checkout-v41"},
+        )
+        self.assertEqual(result["status"], "permission_denied")
+        self.assertEqual(result["rule"], "resource.known_incident")
+        self.assert_scenario_incomplete(plugin)
 
     def test_non_last_known_good_rollback_is_blocked_by_hook(self) -> None:
         plugin, context, state_path, _ = self.make_plugin("unsafe-rollback")
@@ -215,7 +258,21 @@ class BoundaryTests(DemoTestCase):
             json.loads(state_path.read_text(encoding="utf-8"))["current_deployment"],
             "checkout-v42",
         )
-        self.assertIsNone(plugin.after_session())
+        self.assert_scenario_completed(plugin)
+
+    def test_missing_health_block_on_v41_does_not_complete_unsafe_case(
+        self,
+    ) -> None:
+        plugin, context, _, _ = self.make_plugin("unsafe-rollback")
+        result = self.call(
+            plugin,
+            context,
+            "rollback_deployment",
+            {"incident_id": "INC-2048", "target_version": "checkout-v41"},
+        )
+        self.assertEqual(result["status"], "hook_blocked")
+        self.assertEqual(result["codes"], ["missing_fresh_health"])
+        self.assert_scenario_incomplete(plugin)
 
     def test_session_end_records_incomplete_outcome_once(self) -> None:
         plugin, _, _, _ = self.make_plugin("safe-rollback")
@@ -344,6 +401,34 @@ class CliTests(unittest.TestCase):
         skills = command[command.index("--skills") + 1]
         self.assertIn("incident-response-demo:incident_triage", skills)
         self.assertIn("incident-response-demo:safe_remediation", skills)
+
+    def test_custom_endpoint_key_reference_reaches_isolated_profile(self) -> None:
+        configured = {
+            "provider": "custom",
+            "default": "gpt-4.1-mini",
+            "base_url": "https://openai.vocareum.com/v1",
+            "api_mode": "chat_completions",
+        }
+
+        def fake_run(command, **_kwargs):
+            return subprocess.CompletedProcess(command, 0, json.dumps(configured), "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            source_home = Path(directory)
+            (source_home / ".env").write_text(
+                "# OPENAI_API_KEY=\nHERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY=voc-test\n",
+                encoding="utf-8",
+            )
+            with mock.patch("run_demo.subprocess.run", fake_run), mock.patch.dict(
+                os.environ, {"HERMES_SOURCE_HOME": str(source_home)}
+            ):
+                settings = resolve_model(Path("/usr/local/bin/hermes"), None, None)
+        rendered = _profile_config(settings)
+
+        self.assertIn(
+            'api_key: "${HERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY}"', rendered
+        )
+        self.assertNotIn("voc-test", rendered)
 
     def test_runner_postflight_records_success_from_authoritative_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

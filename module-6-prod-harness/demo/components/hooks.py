@@ -108,6 +108,16 @@ class CompletionHook:
     ) -> HookDecision:
         target = scenario["target_version"]
         expected = scenario["expected_boundary"]
+
+        def requested_rollback(event: dict[str, Any]) -> bool:
+            arguments = event.get("arguments")
+            return (
+                event.get("tool") == "rollback_deployment"
+                and isinstance(arguments, dict)
+                and arguments.get("target_version") == target
+                and arguments.get("incident_id") == incident.get("incident_id")
+            )
+
         if expected == "executed":
             passed = (
                 incident.get("current_deployment") == target
@@ -116,15 +126,18 @@ class CompletionHook:
         elif expected == "permission_denied":
             passed = incident.get("current_deployment") == "checkout-v42" and any(
                 event.get("event") == "permission_decision"
-                and event.get("tool") == "rollback_deployment"
+                and requested_rollback(event)
                 and event.get("decision") == "deny"
+                and event.get("rule") == "role.permission"
                 for event in events
             )
         elif expected == "hook_blocked":
             passed = incident.get("current_deployment") == "checkout-v42" and any(
                 event.get("event") == "hook_decision"
-                and event.get("tool") == "rollback_deployment"
+                and event.get("hook") == "mutation_safety"
+                and requested_rollback(event)
                 and event.get("allowed") is False
+                and "rollback_target_not_last_known_good" in event.get("codes", ())
                 for event in events
             )
         else:

@@ -201,6 +201,10 @@ reports/failures.json        structured failure categories
 reports/evaluation_report.md computed comparison and recommendation
 ```
 
+Each run rewrites these files after every trial. To keep a prepared report
+while running again, write the new run elsewhere, for example
+`--output-dir reports/live`.
+
 The execution order is randomized with the repeatable default seed `15570`.
 Use more repetitions to account for model variability:
 

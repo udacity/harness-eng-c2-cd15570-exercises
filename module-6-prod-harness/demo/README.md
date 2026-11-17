@@ -78,6 +78,12 @@ If Hermes is not configured yet, run:
 hermes setup
 ```
 
+In `hermes setup`, choose **Custom endpoint (enter URL manually)** and enter
+the base URL `https://openai.vocareum.com/v1`, your Vocareum API key,
+API mode **Chat Completions**, and the model `gpt-4.1-mini`. This saves the key
+as `HERMES_CUSTOM_OPENAI_VOCAREUM_COM_API_KEY`, which the demo passes to its
+isolated profile.
+
 For the course's tested `gpt-4.1-mini` route through Vocareum, force the
 Chat Completions wire format and verify that it was saved:
 

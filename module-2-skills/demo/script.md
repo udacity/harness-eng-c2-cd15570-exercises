@@ -1,4 +1,4 @@
-# Module 2 Demo: Six-Minute Instructor Script
+# Module 2 Demo: Seven-Minute Instructor Script
 
 ## Before the demonstration
 

@@ -9,4 +9,4 @@ class HookResult:
 
     allowed: bool
     violations: list[str] = field(default_factory=list)
-    checks: dict[str, bool] = field(default_factory=dict)
+    checks: dict[str, bool | None] = field(default_factory=dict)

@@ -237,9 +237,13 @@ def run_external_evaluation_loop(
                 false_positive_observed=false_positive_observed,
             )
 
-        feedback = "\n".join(
-            deterministic_results + [evaluator_feedback(external_evaluation.output_text)]
+        inferential_feedback = (
+            "FACTUAL_GROUNDING and USEFUL_NEXT_STEP passed; "
+            "keep those qualities while fixing the failed Python checks."
+            if inferential_passed
+            else evaluator_feedback(external_evaluation.output_text)
         )
+        feedback = "\n".join(deterministic_results + [inferential_feedback])
         emit("\nIndependent feedback sent to the generator:")
         emit(feedback)
         emit(f"External revision call: previous_response_id={response.id}")

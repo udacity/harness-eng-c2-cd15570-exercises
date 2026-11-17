@@ -103,7 +103,19 @@ def validate_mutation(
             tool_name, arguments, incident
         ),
     }
-    checks = {name: not messages for name, messages in findings.items()}
+    applicable = {
+        "fresh_health_evidence": True,
+        "rollback_target_exists": tool_name == "rollback_deployment",
+        "rollback_target_last_known_good": tool_name == "rollback_deployment",
+        "mutation_not_repeated": True,
+        "resolution_state_valid": tool_name == "update_incident_status"
+        and arguments.get("status") == "RESOLVED",
+    }
+    # None marks a check that does not apply to this mutation (printed as N/A).
+    checks = {
+        name: (not messages) if applicable[name] else None
+        for name, messages in findings.items()
+    }
     violations = [
         message for messages in findings.values() for message in messages
     ]
