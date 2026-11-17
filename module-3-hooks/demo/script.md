@@ -76,6 +76,10 @@ Describe the observed run rather than promising exact cycle or request counts.
 > Every applicable check contributes to one allow-or-block decision. Malformed
 > arguments, an unexpected tool, or an incident-ID mismatch fail closed. These
 > checks do not ask the model for another opinion.
+>
+> The prompt asks the model to read health and deployment history before each
+> mutation. The hook does not rely on that instruction. It records whether the
+> health read actually happened, and blocks the mutation if it did not.
 
 **Show:** the `mode == "hooks"` branch in `_tool_result` in `agent.py`.
 

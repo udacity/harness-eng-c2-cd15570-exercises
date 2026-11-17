@@ -3,7 +3,15 @@
 from types import SimpleNamespace
 import unittest
 
+from agent import BASE_INSTRUCTIONS
 from evaluator import criterion_passed, evaluate_final_note
+
+
+class AgentPromptTests(unittest.TestCase):
+    def test_prompt_asks_for_health_and_history_before_mutation(self) -> None:
+        self.assertIn("Before each mutation request", BASE_INSTRUCTIONS)
+        self.assertIn("get_service_health", BASE_INSTRUCTIONS)
+        self.assertIn("get_deployment_history", BASE_INSTRUCTIONS)
 
 
 class EvaluationContractTests(unittest.TestCase):

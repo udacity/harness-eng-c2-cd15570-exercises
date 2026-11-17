@@ -54,6 +54,13 @@ by the operator, even if its instructions say the change looks unsafe. This
 makes the same proposal visible in both modes. The model proposes the action;
 the harness makes the final execution decision.
 
+The prompt also tells the model to read service health and deployment history
+before each mutation request, and to read health again after a mutation
+executes. This is advice, not enforcement: the hook still checks for that
+evidence itself and blocks the mutation if the read did not happen. The
+instruction keeps a skipped read from blocking `valid_rollback`, so the
+blocks you see come from the rollback-target and resolution checks.
+
 ```text
 model proposes rollback_deployment or update_incident_status
                               |

@@ -235,6 +235,12 @@ class EnforcementBoundaryTests(DemoTestCase):
         self.assertNotIn("# Safe remediation", instructions)
         self.assertNotIn("Treat a production mutation as a proposed", instructions)
 
+    def test_prompt_asks_for_health_and_history_before_mutation(self) -> None:
+        instructions = build_instructions(self.catalog)
+        self.assertIn("Before each\nmutation request", instructions)
+        self.assertIn("get_service_health", instructions)
+        self.assertIn("get_deployment_history", instructions)
+
 
 class ScenarioTests(DemoTestCase):
     def test_every_scenario_references_trusted_users_and_skills(self) -> None:
